@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { ArrowRight, Copy, CheckCircle2, QrCode, AlertCircle, Clock, Loader2 } from 'lucide-react';
+import { ArrowRight, Copy, CheckCircle2, QrCode, AlertCircle, Loader2 } from 'lucide-react';
 import { useAccount } from 'wagmi';
 import { Dialog, DialogContent } from './ui/dialog';
 
@@ -77,7 +77,7 @@ export function BuyPage({ onNavigate }: BuyPageProps) {
 
         <div className="grid md:grid-cols-2 gap-8">
           {/* Order Form */}
-          <div className="bg-white rounded-2xl p-8 border border-border/50 shadow-lg">
+          <div className="bg-card rounded-2xl p-8 border border-border/50 shadow-lg">
             <h2 className="text-2xl font-semibold text-primary mb-6">Place Order</h2>
             
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -155,7 +155,7 @@ export function BuyPage({ onNavigate }: BuyPageProps) {
             )}
 
             {orderStatus !== 'form' && (
-              <div className="bg-white rounded-2xl p-8 border border-border/50 shadow-lg">
+              <div className="bg-card rounded-2xl p-8 border border-border/50 shadow-lg">
                 <h3 className="text-xl font-semibold text-primary mb-6">Bank Transfer Instructions</h3>
                 
                 <div className="space-y-4">
@@ -267,8 +267,8 @@ function PaymentStatusModal({ status, amount, transactionId }: { status: OrderSt
   const statusConfig = {
     verified: {
       icon: CheckCircle2,
-      color: 'text-blue-600',
-      bg: 'bg-blue-50',
+      color: 'text-blue-600 dark:text-blue-400',
+      bg: 'bg-blue-50 dark:bg-blue-950',
       title: 'Payment Verified',
       description: 'Your payment has been confirmed. Minting your BOBC tokens...',
     },

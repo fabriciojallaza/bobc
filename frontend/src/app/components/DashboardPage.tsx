@@ -80,7 +80,7 @@ export function DashboardPage() {
       <div className="min-h-screen py-12 md:py-20">
         <div className="max-w-7xl mx-auto px-6">
           <div className="flex items-center justify-center min-h-[60vh]">
-            <div className="bg-white rounded-2xl p-12 border border-border/50 shadow-lg text-center max-w-md">
+            <div className="bg-card rounded-2xl p-12 border border-border/50 shadow-lg text-center max-w-md">
               <div className="w-20 h-20 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-6">
                 <Wallet className="w-10 h-10 text-primary" />
               </div>
@@ -133,7 +133,7 @@ export function DashboardPage() {
                   </button>
                 </div>
                 
-                <div className="bg-white rounded-xl p-6 space-y-4">
+                <div className="bg-card rounded-xl p-6 space-y-4">
                   <div className="flex justify-between items-center pb-4 border-b border-border">
                     <span className="text-sm text-muted-foreground">Transaction ID</span>
                     <span className="font-mono text-sm font-semibold text-foreground">{transactions[0].id}</span>
@@ -165,7 +165,7 @@ export function DashboardPage() {
 
         {/* Balance Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-12">
-          <div className="md:col-span-2 bg-gradient-to-br from-primary to-primary/90 rounded-2xl p-8 text-white shadow-xl">
+          <div className="md:col-span-2 bg-gradient-to-br from-primary to-primary/90 dark:from-[#0B1C2D] dark:to-[#0B1C2D]/90 rounded-2xl p-8 text-white shadow-xl">
             <div className="flex items-start justify-between mb-6">
               <div>
                 <div className="text-sm text-white/70 mb-2">Total Balance</div>
@@ -178,7 +178,7 @@ export function DashboardPage() {
             </div>
             
             <div className="flex gap-3">
-              <button className="flex-1 py-3 bg-white text-primary rounded-xl hover:bg-white/90 transition-all font-medium">
+              <button className="flex-1 py-3 bg-white text-[#0B1C2D] rounded-xl hover:bg-white/90 transition-all font-medium">
                 Buy More
               </button>
               <button className="flex-1 py-3 bg-white/10 backdrop-blur-sm text-white rounded-xl hover:bg-white/20 transition-all font-medium flex items-center justify-center gap-2">
@@ -188,7 +188,7 @@ export function DashboardPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-8 border border-border/50 shadow-sm">
+          <div className="bg-card rounded-2xl p-8 border border-border/50 shadow-sm">
             <div className="flex items-start justify-between mb-6">
               <div>
                 <div className="text-sm text-muted-foreground mb-2">Current Rate</div>
@@ -206,7 +206,7 @@ export function DashboardPage() {
         </div>
 
         {/* Transaction History */}
-        <div className="bg-white rounded-2xl border border-border/50 shadow-sm overflow-hidden">
+        <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
           <div className="p-8 border-b border-border/50">
             <h2 className="text-2xl font-semibold text-primary">Transaction History</h2>
           </div>
@@ -264,12 +264,12 @@ function StatusBadge({ status }: { status: string }) {
     pending: {
       icon: Clock,
       label: 'Pending',
-      className: 'bg-yellow-50 text-yellow-600 border-yellow-200',
+      className: 'bg-yellow-50 text-yellow-600 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-400 dark:border-yellow-800',
     },
     failed: {
       icon: XCircle,
       label: 'Failed',
-      className: 'bg-red-50 text-red-600 border-red-200',
+      className: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800',
     },
   };
 

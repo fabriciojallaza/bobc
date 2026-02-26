@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(ls:*)",
-      "Bash(echo EXIT:$?:*)"
+      "Bash(echo EXIT:$?:*)",
+      "Bash(pnpm run:*)"
     ]
   }
 }

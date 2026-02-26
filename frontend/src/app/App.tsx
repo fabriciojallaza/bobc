@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from 'next-themes';
 import { config } from './config/wagmi';
 import { Header } from "./components/Header";
 import { Footer } from "./components/Footer";
@@ -32,13 +33,15 @@ export default function App() {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
-        <div className="min-h-screen flex flex-col">
-          <Header currentPage={currentPage} onNavigate={setCurrentPage} />
-          <main className="flex-1">
-            {renderPage()}
-          </main>
-          <Footer />
-        </div>
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+          <div className="min-h-screen flex flex-col">
+            <Header currentPage={currentPage} onNavigate={setCurrentPage} />
+            <main className="flex-1">
+              {renderPage()}
+            </main>
+            <Footer />
+          </div>
+        </ThemeProvider>
       </QueryClientProvider>
     </WagmiProvider>
   );

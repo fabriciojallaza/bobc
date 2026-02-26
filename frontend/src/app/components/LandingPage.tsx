@@ -8,7 +8,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
   return (
     <div className="min-h-screen flex flex-col">
       {/* Hero Section */}
-      <section className="bg-gradient-to-b from-white to-background py-20 md:py-32">
+      <section className="bg-gradient-to-b from-background to-background py-20 md:py-32">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center max-w-4xl mx-auto">
             <div className="inline-flex items-center gap-2 bg-accent/10 text-accent px-4 py-2 rounded-full mb-6">
@@ -34,7 +34,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               </button>
               <button
                 onClick={() => onNavigate('transparency')}
-                className="px-8 py-4 bg-white text-primary border-2 border-primary/10 rounded-xl hover:border-primary/30 transition-all"
+                className="px-8 py-4 bg-card text-primary border-2 border-primary/10 rounded-xl hover:border-primary/30 transition-all"
               >
                 View Transparency
               </button>
@@ -59,7 +59,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
       </section>
 
       {/* How It Works */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-card">
         <div className="max-w-7xl mx-auto px-6">
           <div className="text-center mb-16">
             <h2 className="text-4xl font-semibold text-primary mb-4">How It Works</h2>
@@ -123,7 +123,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
-            <div className="bg-white rounded-2xl p-8 border border-border/50 shadow-sm">
+            <div className="bg-card rounded-2xl p-8 border border-border/50 shadow-sm">
               <div className="text-sm text-muted-foreground mb-2">Bank Balance</div>
               <div className="text-3xl font-semibold text-primary mb-1">Bs 12,450,000</div>
               <div className="text-sm text-accent flex items-center gap-1">
@@ -132,7 +132,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-8 border border-border/50 shadow-sm">
+            <div className="bg-card rounded-2xl p-8 border border-border/50 shadow-sm">
               <div className="text-sm text-muted-foreground mb-2">BOBC Supply</div>
               <div className="text-3xl font-semibold text-primary mb-1">12,450,000</div>
               <div className="text-sm text-accent flex items-center gap-1">
@@ -141,7 +141,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               </div>
             </div>
 
-            <div className="bg-white rounded-2xl p-8 border border-border/50 shadow-sm">
+            <div className="bg-card rounded-2xl p-8 border border-border/50 shadow-sm">
               <div className="text-sm text-muted-foreground mb-2">Peg Status</div>
               <div className="text-3xl font-semibold text-accent mb-1">1:1</div>
               <div className="text-sm text-accent flex items-center gap-1">
@@ -164,7 +164,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
       </section>
 
       {/* Trust Section */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-card">
         <div className="max-w-7xl mx-auto px-6">
           <div className="grid md:grid-cols-3 gap-12">
             <div className="text-center">

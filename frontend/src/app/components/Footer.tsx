@@ -2,13 +2,13 @@ import { Shield, FileText, Mail } from 'lucide-react';
 
 export function Footer() {
   return (
-    <footer className="bg-white border-t border-border/50 mt-auto">
+    <footer className="bg-background border-t border-border/50 mt-auto">
       <div className="max-w-7xl mx-auto px-6 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-8">
           <div className="col-span-1 md:col-span-2">
             <div className="flex items-center gap-2 mb-4">
               <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-                <span className="text-white text-xl font-semibold">B</span>
+                <span className="text-primary-foreground text-xl font-semibold">B</span>
               </div>
               <div className="flex flex-col">
                 <span className="font-semibold text-lg text-primary">BOBC</span>

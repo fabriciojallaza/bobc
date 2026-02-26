@@ -22,7 +22,7 @@ export function TransparencyPage() {
 
         {/* Main Metrics */}
         <div className="grid md:grid-cols-3 gap-8 mb-16">
-          <div className="bg-white rounded-2xl p-8 border border-border/50 shadow-lg">
+          <div className="bg-card rounded-2xl p-8 border border-border/50 shadow-lg">
             <div className="flex items-start justify-between mb-6">
               <div className="w-14 h-14 bg-accent/10 rounded-xl flex items-center justify-center">
                 <Building2 className="w-7 h-7 text-accent" />
@@ -41,7 +41,7 @@ export function TransparencyPage() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-8 border border-border/50 shadow-lg">
+          <div className="bg-card rounded-2xl p-8 border border-border/50 shadow-lg">
             <div className="flex items-start justify-between mb-6">
               <div className="w-14 h-14 bg-accent/10 rounded-xl flex items-center justify-center">
                 <Coins className="w-7 h-7 text-accent" />
@@ -81,7 +81,7 @@ export function TransparencyPage() {
         </div>
 
         {/* Peg Indicator */}
-        <div className="bg-white rounded-2xl p-8 border border-border/50 shadow-sm mb-16">
+        <div className="bg-card rounded-2xl p-8 border border-border/50 shadow-sm mb-16">
           <h2 className="text-2xl font-semibold text-primary mb-6">1:1 Peg Status</h2>
           
           <div className="max-w-3xl mx-auto">
@@ -121,7 +121,7 @@ export function TransparencyPage() {
               BOBC operates on a strict 1:1 backing mechanism to ensure every token is fully collateralized:
             </p>
 
-            <div className="bg-white rounded-xl p-6 border border-border/50 mb-6">
+            <div className="bg-card rounded-xl p-6 border border-border/50 mb-6">
               <div className="flex items-start gap-4">
                 <div className="w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center flex-shrink-0">
                   <CheckCircle2 className="w-5 h-5 text-accent" />
@@ -136,14 +136,14 @@ export function TransparencyPage() {
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
-              <div className="bg-white rounded-xl p-6 border border-border/50">
+              <div className="bg-card rounded-xl p-6 border border-border/50">
                 <div className="text-sm text-muted-foreground mb-2">Formula</div>
                 <code className="block bg-background px-4 py-3 rounded-lg text-sm font-mono">
                   Bank Balance ≥ Supply + Order
                 </code>
               </div>
 
-              <div className="bg-white rounded-xl p-6 border border-border/50">
+              <div className="bg-card rounded-xl p-6 border border-border/50">
                 <div className="text-sm text-muted-foreground mb-2">Example</div>
                 <code className="block bg-background px-4 py-3 rounded-lg text-sm font-mono">
                   Bs 12,450,000 ≥ 12,450,000 + 0
@@ -155,7 +155,7 @@ export function TransparencyPage() {
 
         {/* Audit Information */}
         <div className="mt-16 grid md:grid-cols-2 gap-8">
-          <div className="bg-white rounded-xl p-6 border border-border/50">
+          <div className="bg-card rounded-xl p-6 border border-border/50">
             <h3 className="text-lg font-semibold text-primary mb-4">Bank Verification</h3>
             <ul className="space-y-3 text-sm">
               <li className="flex items-start gap-3">
@@ -173,7 +173,7 @@ export function TransparencyPage() {
             </ul>
           </div>
 
-          <div className="bg-white rounded-xl p-6 border border-border/50">
+          <div className="bg-card rounded-xl p-6 border border-border/50">
             <h3 className="text-lg font-semibold text-primary mb-4">Smart Contract</h3>
             <ul className="space-y-3 text-sm">
               <li className="flex items-start gap-3">

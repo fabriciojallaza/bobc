@@ -1,5 +1,6 @@
 import { Shield, Wallet } from 'lucide-react';
 import { useAccount, useConnect, useDisconnect } from 'wagmi';
+import { ThemeToggle } from './ThemeToggle';
 
 interface HeaderProps {
   currentPage: 'home' | 'buy' | 'dashboard' | 'transparency';
@@ -27,12 +28,12 @@ export function Header({ currentPage, onNavigate }: HeaderProps) {
   };
 
   return (
-    <header className="bg-white border-b border-border/50 sticky top-0 z-50 backdrop-blur-sm bg-white/90">
+    <header className="bg-background/90 border-b border-border/50 sticky top-0 z-50 backdrop-blur-sm">
       <div className="max-w-7xl mx-auto px-6 py-4">
         <div className="flex items-center justify-between">
           <button onClick={() => onNavigate('home')} className="flex items-center gap-2 group">
             <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center shadow-sm">
-              <span className="text-white text-xl font-semibold">B</span>
+              <span className="text-primary-foreground text-xl font-semibold">B</span>
             </div>
             <div className="flex flex-col">
               <span className="font-semibold text-lg text-primary tracking-tight">BOBC</span>
@@ -75,6 +76,7 @@ export function Header({ currentPage, onNavigate }: HeaderProps) {
           </nav>
 
           <div className="flex items-center gap-3">
+            <ThemeToggle />
             {isConnected && address ? (
               <button
                 onClick={() => disconnect()}
@@ -86,7 +88,7 @@ export function Header({ currentPage, onNavigate }: HeaderProps) {
             ) : (
               <button
                 onClick={handleConnect}
-                className="px-4 py-2.5 bg-white text-primary rounded-lg hover:bg-primary/5 transition-colors flex items-center gap-2 border border-border shadow-sm"
+                className="px-4 py-2.5 bg-background text-primary rounded-lg hover:bg-primary/5 transition-colors flex items-center gap-2 border border-border shadow-sm"
               >
                 <Wallet className="w-4 h-4" />
                 <span>Connect Wallet</span>
