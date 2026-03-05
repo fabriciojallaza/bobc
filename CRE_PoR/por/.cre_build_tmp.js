@@ -15273,13 +15273,11 @@ var fetchReserveInfo = (sendRequester, config) => {
     throw new Error(`HTTP request failed with status: ${response.statusCode}`);
   }
   const responseText = Buffer.from(response.body).toString("utf-8");
-  const porResp = JSON.parse(responseText);
-  if (porResp.ripcord) {
-    throw new Error("ripcord is true");
+  const data = JSON.parse(responseText);
+  if (typeof data.balance !== "number" || Number.isNaN(data.balance)) {
+    throw new Error(`Invalid API response: expected { balance: number }, got: ${responseText}`);
   }
-  return {
-    totalReserve: porResp.totalToken
-  };
+  return { totalReserve: data.balance };
 };
 var writeApiValueReport = (evmConfig, runtime2, apiValueScaled) => {
   const network248 = getNetwork({

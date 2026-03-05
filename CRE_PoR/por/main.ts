@@ -16,7 +16,7 @@ import {
   
   const configSchema = z.object({
 	schedule: z.string(),
-	url: z.string(),
+	url: z.string(), // e.g. http://localhost:3000/balance
 	evms: z.array(
 	  z.object({
 		receiverAddress: z.string(),
@@ -29,18 +29,15 @@ import {
   type Config = z.infer<typeof configSchema>
   type EVMConfig = z.infer<typeof configSchema.shape.evms.element>
   
-  interface PORResponse {
-	accountName: string
-	totalTrust: number
-	totalToken: number
-	ripcord: boolean
-	updatedAt: string
+  interface BankResp {
+	balance: number // e.g. 0, 100, 2000 (human units)
   }
   
   interface ReserveInfo {
 	totalReserve: number
   }
   
+  // Utility function to safely stringify objects with bigints
   const safeJsonStringify = (obj: any): string =>
 	JSON.stringify(obj, (_, value) => (typeof value === 'bigint' ? value.toString() : value), 2)
   
@@ -52,15 +49,13 @@ import {
 	}
   
 	const responseText = Buffer.from(response.body).toString('utf-8')
-	const porResp: PORResponse = JSON.parse(responseText)
+	const data: BankResp = JSON.parse(responseText)
   
-	if (porResp.ripcord) {
-	  throw new Error('ripcord is true')
+	if (typeof data.balance !== 'number' || Number.isNaN(data.balance)) {
+	  throw new Error(`Invalid API response: expected { balance: number }, got: ${responseText}`)
 	}
   
-	return {
-	  totalReserve: porResp.totalToken,
-	}
+	return { totalReserve: data.balance }
   }
   
   const writeApiValueReport = (
@@ -82,7 +77,7 @@ import {
   
 	runtime.log(`Writing apiValueScaled=${apiValueScaled.toString()} to ${evmConfig.chainName}`)
   
-	// Report payload that your receiver will decode with: abi.decode(report, (uint256))
+	// report payload = abi.encode(uint256 apiValueScaled)
 	const reportData = encodeAbiParameters(
 	  [{ name: 'apiValue', type: 'uint256' }],
 	  [apiValueScaled],
@@ -131,7 +126,7 @@ import {
   
 	runtime.log(`ReserveInfo ${safeJsonStringify(reserveInfo)}`)
   
-	// IMPORTANT: this assumes API returns "human" units and you want 18 decimals onchain
+	// API is human units (Bs). We scale to 18 decimals for onchain math.
 	const apiValueScaled = parseUnits(reserveInfo.totalReserve.toString(), 18)
 	runtime.log(`apiValueScaled ${apiValueScaled.toString()}`)
   
