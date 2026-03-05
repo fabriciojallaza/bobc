@@ -1,72 +1,161 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-interface IERC165 { function supportsInterface(bytes4 interfaceId) external view returns (bool); }
-interface IReceiver is IERC165 { function onReport(bytes calldata metadata, bytes calldata report) external; }
+import "@openzeppelin/contracts/access/AccessControl.sol";
+import "@openzeppelin/contracts/security/Pausable.sol";
 
-interface IMintableERC20 {
-    function totalSupply() external view returns (uint256);
-    function mint(address to, uint256 amount) external;
+interface IOracle {
+  function lastBalance() external view returns (uint256);
 }
 
-contract SequentialBankPoRReceiver is IReceiver {
-    address public immutable forwarder;     // MockForwarder (simulate) o KeystoneForwarder (prod)
-    IMintableERC20 public immutable token;
-    address public admin;
+interface IMintableERC20 {
+  function mint(address to, uint256 amount) external;
+}
 
-    uint256 public lastBankBalance;         // “balance confirmado”
-    bool public hasPending;
-    address public pendingRecipient;
-    uint256 public pendingAmount;
+contract MintController is AccessControl, Pausable {
+  bytes32 public constant ADMIN_ROLE = keccak256("ADMIN_ROLE");
+  bytes32 public constant OPERATOR_ROLE = keccak256("OPERATOR_ROLE");
 
-    error OnlyForwarder();
-    error OnlyAdmin();
-    error NoPending();
-    error BalanceDecreased();
-    error DeltaMismatch(uint256 delta, uint256 expected);
+  IOracle public immutable oracle;
+  IMintableERC20 public immutable token;
 
-    constructor(address _forwarder, address _token, address _admin, uint256 _initialBankBalance) {
-        forwarder = _forwarder;
-        token = IMintableERC20(_token);
-        admin = _admin;
-        lastBankBalance = _initialBankBalance;
+  // Balance del oracle ya “consumido” para mintear órdenes
+  uint256 public processedBalance;
+
+  // Safety params
+  uint256 public maxDeltaPerProcess;     // cap: si el delta es gigante, revert
+  uint256 public minOrderAmount;         // anti-spam
+  uint256 public maxOrdersPerProcess;    // evita out-of-gas
+
+  enum Status { Pending, Processed, Cancelled, Expired }
+
+  struct Order {
+    address recipient;
+    uint256 amount;      // scaled (18)
+    uint256 createdAt;
+    uint256 expiresAt;   // 0 = no expira
+    Status status;
+  }
+
+  uint256 public nextOrderId;
+  uint256 public head; // FIFO pointer
+  mapping(uint256 => Order) public orders;
+
+  event OrderCreated(uint256 indexed orderId, address indexed recipient, uint256 amount, uint256 expiresAt);
+  event OrderCancelled(uint256 indexed orderId, string reason);
+  event OrderProcessed(uint256 indexed orderId, address indexed recipient, uint256 amount);
+  event ProcessedUpTo(uint256 oldProcessedBalance, uint256 newProcessedBalance, uint256 consumedDelta, uint256 ordersProcessed);
+  event ParamsUpdated(uint256 maxDeltaPerProcess, uint256 minOrderAmount, uint256 maxOrdersPerProcess);
+
+  error OracleDecreased();
+  error DeltaTooBig(uint256 delta, uint256 cap);
+  error BadRecipient();
+  error AmountTooSmall();
+  error BadExpiry();
+  error NotPending();
+
+  constructor(
+    address _oracle,
+    address _token,
+    address admin,
+    uint256 _initialProcessedBalance
+  ) {
+    oracle = IOracle(_oracle);
+    token = IMintableERC20(_token);
+    processedBalance = _initialProcessedBalance;
+
+    _grantRole(DEFAULT_ADMIN_ROLE, admin);
+    _grantRole(ADMIN_ROLE, admin);
+    _grantRole(OPERATOR_ROLE, admin);
+
+    // Defaults (puedes cambiarlos luego con setParams)
+    maxDeltaPerProcess = 10_000_000e18;
+    minOrderAmount = 1e18;
+    maxOrdersPerProcess = 20;
+
+    emit ParamsUpdated(maxDeltaPerProcess, minOrderAmount, maxOrdersPerProcess);
+  }
+
+  function setParams(uint256 _maxDelta, uint256 _minOrder, uint256 _maxOrders) external onlyRole(ADMIN_ROLE) {
+    maxDeltaPerProcess = _maxDelta;
+    minOrderAmount = _minOrder;
+    maxOrdersPerProcess = _maxOrders;
+    emit ParamsUpdated(_maxDelta, _minOrder, _maxOrders);
+  }
+
+  function pauseMinting() external onlyRole(ADMIN_ROLE) { _pause(); }
+  function unpauseMinting() external onlyRole(ADMIN_ROLE) { _unpause(); }
+
+  // ✅ Solo tu backend/agente crea órdenes
+  function createOrder(address recipient, uint256 amount, uint256 expiresAt)
+    external
+    onlyRole(OPERATOR_ROLE)
+    returns (uint256 id)
+  {
+    if (recipient == address(0)) revert BadRecipient();
+    if (amount < minOrderAmount) revert AmountTooSmall();
+    if (expiresAt != 0 && expiresAt <= block.timestamp) revert BadExpiry();
+
+    id = nextOrderId++;
+    orders[id] = Order({
+      recipient: recipient,
+      amount: amount,
+      createdAt: block.timestamp,
+      expiresAt: expiresAt,
+      status: Status.Pending
+    });
+
+    emit OrderCreated(id, recipient, amount, expiresAt);
+  }
+
+  function cancelOrder(uint256 orderId, string calldata reason) external onlyRole(ADMIN_ROLE) {
+    Order storage o = orders[orderId];
+    if (o.status != Status.Pending) revert NotPending();
+    o.status = Status.Cancelled;
+    emit OrderCancelled(orderId, reason);
+  }
+
+  // ✅ Cualquiera puede llamar process(), pero respeta pause
+  function process() external whenNotPaused {
+    uint256 current = oracle.lastBalance();
+    if (current < processedBalance) revert OracleDecreased();
+
+    uint256 delta = current - processedBalance;
+    if (delta > maxDeltaPerProcess) revert DeltaTooBig(delta, maxDeltaPerProcess);
+
+    uint256 oldProcessed = processedBalance;
+    uint256 consumed = 0;
+    uint256 processedCount = 0;
+
+    while (head < nextOrderId && delta > 0 && processedCount < maxOrdersPerProcess) {
+      Order storage o = orders[head];
+
+      if (o.status != Status.Pending) { head++; continue; }
+
+      if (o.expiresAt != 0 && block.timestamp > o.expiresAt) {
+        o.status = Status.Expired;
+        emit OrderCancelled(head, "expired");
+        head++;
+        continue;
+      }
+
+      if (delta < o.amount) break; // aún no alcanza para la próxima orden FIFO
+
+      // consume y mintea
+      delta -= o.amount;
+      consumed += o.amount;
+      o.status = Status.Processed;
+
+      token.mint(o.recipient, o.amount);
+      emit OrderProcessed(head, o.recipient, o.amount);
+
+      head++;
+      processedCount++;
     }
 
-    modifier onlyForwarder() { if (msg.sender != forwarder) revert OnlyForwarder(); _; }
-    modifier onlyAdmin() { if (msg.sender != admin) revert OnlyAdmin(); _; }
+    // avanzamos processedBalance hasta donde realmente consumimos
+    processedBalance = current - delta;
 
-    function supportsInterface(bytes4 interfaceId) external pure returns (bool) {
-        return interfaceId == type(IReceiver).interfaceId || interfaceId == type(IERC165).interfaceId;
-    }
-
-    // Admin crea/actualiza la orden SECUENCIAL (solo una activa)
-    function setPending(address recipient, uint256 amount) external onlyAdmin {
-        pendingRecipient = recipient;
-        pendingAmount = amount;
-        hasPending = true;
-    }
-
-    function clearPending() external onlyAdmin {
-        hasPending = false;
-        pendingRecipient = address(0);
-        pendingAmount = 0;
-    }
-
-    // report = abi.encode(uint256 bankBalanceScaled)
-    function onReport(bytes calldata /*metadata*/, bytes calldata report) external onlyForwarder {
-        uint256 bankBalance = abi.decode(report, (uint256));
-
-        if (bankBalance < lastBankBalance) revert BalanceDecreased();
-        if (!hasPending) revert NoPending();
-
-        uint256 delta = bankBalance - lastBankBalance;
-        if (delta != pendingAmount) revert DeltaMismatch(delta, pendingAmount);
-
-        token.mint(pendingRecipient, pendingAmount);
-
-        lastBankBalance = bankBalance;
-        hasPending = false;
-        pendingRecipient = address(0);
-        pendingAmount = 0;
-    }
+    emit ProcessedUpTo(oldProcessed, processedBalance, consumed, processedCount);
+  }
 }

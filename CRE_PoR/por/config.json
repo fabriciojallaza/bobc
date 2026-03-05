@@ -3,7 +3,7 @@
   "url": "http://localhost:3000/balance",
   "evms": [
     {
-      "receiverAddress": "0x75DF7Eaf09Dc86435B56f18d5E947605b6116898",
+      "receiverAddress": "0x2A2D3dD5026D0eD10Ee054d35C9d05fA28FA5015",
       "chainName": "ethereum-testnet-sepolia",
       "gasLimit": "1000000"
     }
