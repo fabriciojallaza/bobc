@@ -1,3 +1,5 @@
 .idea
 /frontend/node_modules/
 /frontend/dist/
+/CRE_PoR/node_modules/
+/CRE_PoR/.env
