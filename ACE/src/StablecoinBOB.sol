@@ -73,6 +73,11 @@ contract StablecoinBOB is ERC20, AccessControl, Pausable, ReentrancyGuard {
         _unpause();
     }
 
+    /// @notice Sets the minter address (grants MINTER_ROLE). Convenience wrapper for external tooling.
+    function setMinter(address m) external onlyRole(DEFAULT_ADMIN_ROLE) {
+        _grantRole(MINTER_ROLE, m);
+    }
+
     /// @notice Queues a policy manager update with timelock
     /// @param _policyManager The new policy manager address
     function updateCompliance(address _policyManager) external onlyRole(DEFAULT_ADMIN_ROLE) {
