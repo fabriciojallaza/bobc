@@ -1,9 +1,9 @@
 {
-  "schedule": "*/30 * * * * *",
-  "url": "http://localhost:3000/batch",
+  "schedule": "*/10 * * * * *",
+  "url": "https://bobc.condordev.xyz/batch",
   "evms": [
     {
-      "receiverAddress": "0xd4aB4E495E43F0f1D0c185079Fd8C213E73D652F",
+      "receiverAddress": "0x4DE639e6A15A62d95E8dB6102868183b9ECD7d63",
       "chainName": "ethereum-testnet-sepolia",
       "gasLimit": "1000000"
     }
