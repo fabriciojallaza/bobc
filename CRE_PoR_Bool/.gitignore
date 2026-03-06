@@ -1,1 +1,3 @@
 *.env
+nav/node_modules/
+por/node_modules/
