@@ -3786,8 +3786,6 @@ var ListSchema = /* @__PURE__ */ messageDesc(file_values_v1_values, 3);
 var DecimalSchema = /* @__PURE__ */ messageDesc(file_values_v1_values, 4);
 var file_sdk_v1alpha_sdk = /* @__PURE__ */ fileDesc("ChVzZGsvdjFhbHBoYS9zZGsucHJvdG8SC3Nkay52MWFscGhhIrQBChVTaW1wbGVDb25zZW5zdXNJbnB1dHMSIQoFdmFsdWUYASABKAsyEC52YWx1ZXMudjEuVmFsdWVIABIPCgVlcnJvchgCIAEoCUgAEjUKC2Rlc2NyaXB0b3JzGAMgASgLMiAuc2RrLnYxYWxwaGEuQ29uc2Vuc3VzRGVzY3JpcHRvchIhCgdkZWZhdWx0GAQgASgLMhAudmFsdWVzLnYxLlZhbHVlQg0KC29ic2VydmF0aW9uIpABCglGaWVsZHNNYXASMgoGZmllbGRzGAEgAygLMiIuc2RrLnYxYWxwaGEuRmllbGRzTWFwLkZpZWxkc0VudHJ5Gk8KC0ZpZWxkc0VudHJ5EgsKA2tleRgBIAEoCRIvCgV2YWx1ZRgCIAEoCzIgLnNkay52MWFscGhhLkNvbnNlbnN1c0Rlc2NyaXB0b3I6AjgBIoYBChNDb25zZW5zdXNEZXNjcmlwdG9yEjMKC2FnZ3JlZ2F0aW9uGAEgASgOMhwuc2RrLnYxYWxwaGEuQWdncmVnYXRpb25UeXBlSAASLAoKZmllbGRzX21hcBgCIAEoCzIWLnNkay52MWFscGhhLkZpZWxkc01hcEgAQgwKCmRlc2NyaXB0b3IiagoNUmVwb3J0UmVxdWVzdBIXCg9lbmNvZGVkX3BheWxvYWQYASABKAwSFAoMZW5jb2Rlcl9uYW1lGAIgASgJEhQKDHNpZ25pbmdfYWxnbxgDIAEoCRIUCgxoYXNoaW5nX2FsZ28YBCABKAkilwEKDlJlcG9ydFJlc3BvbnNlEhUKDWNvbmZpZ19kaWdlc3QYASABKAwSEgoGc2VxX25yGAIgASgEQgIwABIWCg5yZXBvcnRfY29udGV4dBgDIAEoDBISCgpyYXdfcmVwb3J0GAQgASgMEi4KBHNpZ3MYBSADKAsyIC5zZGsudjFhbHBoYS5BdHRyaWJ1dGVkU2lnbmF0dXJlIjsKE0F0dHJpYnV0ZWRTaWduYXR1cmUSEQoJc2lnbmF0dXJlGAEgASgMEhEKCXNpZ25lcl9pZBgCIAEoDSJrChFDYXBhYmlsaXR5UmVxdWVzdBIKCgJpZBgBIAEoCRIlCgdwYXlsb2FkGAIgASgLMhQuZ29vZ2xlLnByb3RvYnVmLkFueRIOCgZtZXRob2QYAyABKAkSEwoLY2FsbGJhY2tfaWQYBCABKAUiWgoSQ2FwYWJpbGl0eVJlc3BvbnNlEicKB3BheWxvYWQYASABKAsyFC5nb29nbGUucHJvdG9idWYuQW55SAASDwoFZXJyb3IYAiABKAlIAEIKCghyZXNwb25zZSJYChNUcmlnZ2VyU3Vic2NyaXB0aW9uEgoKAmlkGAEgASgJEiUKB3BheWxvYWQYAiABKAsyFC5nb29nbGUucHJvdG9idWYuQW55Eg4KBm1ldGhvZBgDIAEoCSJVChpUcmlnZ2VyU3Vic2NyaXB0aW9uUmVxdWVzdBI3Cg1zdWJzY3JpcHRpb25zGAEgAygLMiAuc2RrLnYxYWxwaGEuVHJpZ2dlclN1YnNjcmlwdGlvbiJACgdUcmlnZ2VyEg4KAmlkGAEgASgEQgIwABIlCgdwYXlsb2FkGAIgASgLMhQuZ29vZ2xlLnByb3RvYnVmLkFueSInChhBd2FpdENhcGFiaWxpdGllc1JlcXVlc3QSCwoDaWRzGAEgAygFIrgBChlBd2FpdENhcGFiaWxpdGllc1Jlc3BvbnNlEkgKCXJlc3BvbnNlcxgBIAMoCzI1LnNkay52MWFscGhhLkF3YWl0Q2FwYWJpbGl0aWVzUmVzcG9uc2UuUmVzcG9uc2VzRW50cnkaUQoOUmVzcG9uc2VzRW50cnkSCwoDa2V5GAEgASgFEi4KBXZhbHVlGAIgASgLMh8uc2RrLnYxYWxwaGEuQ2FwYWJpbGl0eVJlc3BvbnNlOgI4ASKgAQoORXhlY3V0ZVJlcXVlc3QSDgoGY29uZmlnGAEgASgMEisKCXN1YnNjcmliZRgCIAEoCzIWLmdvb2dsZS5wcm90b2J1Zi5FbXB0eUgAEicKB3RyaWdnZXIYAyABKAsyFC5zZGsudjFhbHBoYS5UcmlnZ2VySAASHQoRbWF4X3Jlc3BvbnNlX3NpemUYBCABKARCAjAAQgkKB3JlcXVlc3QimQEKD0V4ZWN1dGlvblJlc3VsdBIhCgV2YWx1ZRgBIAEoCzIQLnZhbHVlcy52MS5WYWx1ZUgAEg8KBWVycm9yGAIgASgJSAASSAoVdHJpZ2dlcl9zdWJzY3JpcHRpb25zGAMgASgLMicuc2RrLnYxYWxwaGEuVHJpZ2dlclN1YnNjcmlwdGlvblJlcXVlc3RIAEIICgZyZXN1bHQiVgoRR2V0U2VjcmV0c1JlcXVlc3QSLAoIcmVxdWVzdHMYASADKAsyGi5zZGsudjFhbHBoYS5TZWNyZXRSZXF1ZXN0EhMKC2NhbGxiYWNrX2lkGAIgASgFIiIKE0F3YWl0U2VjcmV0c1JlcXVlc3QSCwoDaWRzGAEgAygFIqsBChRBd2FpdFNlY3JldHNSZXNwb25zZRJDCglyZXNwb25zZXMYASADKAsyMC5zZGsudjFhbHBoYS5Bd2FpdFNlY3JldHNSZXNwb25zZS5SZXNwb25zZXNFbnRyeRpOCg5SZXNwb25zZXNFbnRyeRILCgNrZXkYASABKAUSKwoFdmFsdWUYAiABKAsyHC5zZGsudjFhbHBoYS5TZWNyZXRSZXNwb25zZXM6AjgBIi4KDVNlY3JldFJlcXVlc3QSCgoCaWQYASABKAkSEQoJbmFtZXNwYWNlGAIgASgJIkUKBlNlY3JldBIKCgJpZBgBIAEoCRIRCgluYW1lc3BhY2UYAiABKAkSDQoFb3duZXIYAyABKAkSDQoFdmFsdWUYBCABKAkiSgoLU2VjcmV0RXJyb3ISCgoCaWQYASABKAkSEQoJbmFtZXNwYWNlGAIgASgJEg0KBW93bmVyGAMgASgJEg0KBWVycm9yGAQgASgJIm4KDlNlY3JldFJlc3BvbnNlEiUKBnNlY3JldBgBIAEoCzITLnNkay52MWFscGhhLlNlY3JldEgAEikKBWVycm9yGAIgASgLMhguc2RrLnYxYWxwaGEuU2VjcmV0RXJyb3JIAEIKCghyZXNwb25zZSJBCg9TZWNyZXRSZXNwb25zZXMSLgoJcmVzcG9uc2VzGAEgAygLMhsuc2RrLnYxYWxwaGEuU2VjcmV0UmVzcG9uc2UquAEKD0FnZ3JlZ2F0aW9uVHlwZRIgChxBR0dSRUdBVElPTl9UWVBFX1VOU1BFQ0lGSUVEEAASGwoXQUdHUkVHQVRJT05fVFlQRV9NRURJQU4QARIeChpBR0dSRUdBVElPTl9UWVBFX0lERU5USUNBTBACEiIKHkFHR1JFR0FUSU9OX1RZUEVfQ09NTU9OX1BSRUZJWBADEiIKHkFHR1JFR0FUSU9OX1RZUEVfQ09NTU9OX1NVRkZJWBAEKjkKBE1vZGUSFAoQTU9ERV9VTlNQRUNJRklFRBAAEgwKCE1PREVfRE9OEAESDQoJTU9ERV9OT0RFEAJCaAoPY29tLnNkay52MWFscGhhQghTZGtQcm90b1ABogIDU1hYqgILU2RrLlYxYWxwaGHKAgtTZGtcVjFhbHBoYeICF1Nka1xWMWFscGhhXEdQQk1ldGFkYXRh6gIMU2RrOjpWMWFscGhhYgZwcm90bzM", [file_google_protobuf_any, file_google_protobuf_empty, file_values_v1_values]);
 var SimpleConsensusInputsSchema = /* @__PURE__ */ messageDesc(file_sdk_v1alpha_sdk, 0);
-var FieldsMapSchema = /* @__PURE__ */ messageDesc(file_sdk_v1alpha_sdk, 1);
-var ConsensusDescriptorSchema = /* @__PURE__ */ messageDesc(file_sdk_v1alpha_sdk, 2);
 var ReportRequestSchema = /* @__PURE__ */ messageDesc(file_sdk_v1alpha_sdk, 3);
 var ReportResponseSchema = /* @__PURE__ */ messageDesc(file_sdk_v1alpha_sdk, 4);
 var CapabilityRequestSchema = /* @__PURE__ */ messageDesc(file_sdk_v1alpha_sdk, 6);
@@ -9299,57 +9297,6 @@ var defaultLookup = new NetworkLookup({
   testnetBySelectorByFamily
 });
 var getNetwork = (options) => defaultLookup.find(options);
-
-class ConsensusImpl {
-  descriptor;
-  defaultValue;
-  constructor(descriptor, defaultValue) {
-    this.descriptor = descriptor;
-    this.defaultValue = defaultValue;
-  }
-  withDefault(t) {
-    return new ConsensusImpl(this.descriptor, t);
-  }
-  _usesUToForceShape(_) {}
-}
-function simpleDescriptor(agg) {
-  return create(ConsensusDescriptorSchema, {
-    descriptor: {
-      case: "aggregation",
-      value: agg
-    }
-  });
-}
-function median() {
-  return new ConsensusFieldAggregation(simpleDescriptor(AggregationType.MEDIAN));
-}
-
-class ConsensusFieldAggregation {
-  fieldDescriptor;
-  t;
-  u;
-  constructor(fieldDescriptor, t, u) {
-    this.fieldDescriptor = fieldDescriptor;
-    this.t = t;
-    this.u = u;
-  }
-}
-function ConsensusAggregationByFields(aggregation) {
-  const fieldMap = create(FieldsMapSchema);
-  Object.keys(aggregation).forEach((key) => {
-    const fieldFn = aggregation[key];
-    const fieldAggregation = fieldFn();
-    if (fieldAggregation.fieldDescriptor) {
-      fieldMap.fields[key] = fieldAggregation.fieldDescriptor;
-    }
-  });
-  return new ConsensusImpl(create(ConsensusDescriptorSchema, {
-    descriptor: {
-      case: "fieldsMap",
-      value: fieldMap
-    }
-  }));
-}
 
 class Int64 {
   static INT64_MIN = -(2n ** 63n);
@@ -15266,76 +15213,76 @@ var configSchema = exports_external.object({
     gasLimit: exports_external.string()
   }))
 });
-var safeJsonStringify = (obj) => JSON.stringify(obj, (_, value2) => typeof value2 === "bigint" ? value2.toString() : value2, 2);
-var fetchReserveInfo = (sendRequester, config) => {
-  const response = sendRequester.sendRequest({ method: "GET", url: config.url }).result();
-  if (response.statusCode !== 200) {
-    throw new Error(`HTTP request failed with status: ${response.statusCode}`);
+var safeJson = (obj) => JSON.stringify(obj, (_, v) => typeof v === "bigint" ? v.toString() : v, 2);
+function readBatchFromApi(runtimeAny) {
+  const http2 = new cre.capabilities.HTTPClient;
+  const res = http2.sendRequest(runtimeAny, {
+    method: "GET",
+    url: runtimeAny.config.url
+  }).result();
+  if (res.statusCode !== 200) {
+    const body = Buffer.from(res.body).toString("utf-8");
+    throw new Error(`HTTP ${res.statusCode}: ${body}`);
   }
-  const responseText = Buffer.from(response.body).toString("utf-8");
-  const data = JSON.parse(responseText);
-  if (typeof data.balance !== "number" || Number.isNaN(data.balance)) {
-    throw new Error(`Invalid API response: expected { balance: number }, got: ${responseText}`);
+  const txt = Buffer.from(res.body).toString("utf-8");
+  const data = JSON.parse(txt);
+  if (!Number.isInteger(data.bankBalance) || data.bankBalance < 0) {
+    throw new Error(`Invalid bankBalance (int >= 0). Got: ${txt}`);
   }
-  return { totalReserve: data.balance };
-};
-var writeApiValueReport = (evmConfig, runtime2, apiValueScaled) => {
+  if (!Array.isArray(data.approvedIds) || !data.approvedIds.every((n) => Number.isInteger(n) && n >= 0)) {
+    throw new Error(`Invalid approvedIds (int[] >= 0). Got: ${txt}`);
+  }
+  return data;
+}
+function writeReport(evm, runtime2, bankBalanceScaled, approvedIds) {
   const network248 = getNetwork({
     chainFamily: "evm",
-    chainSelectorName: evmConfig.chainName,
+    chainSelectorName: evm.chainName,
     isTestnet: true
   });
-  if (!network248) {
-    throw new Error(`Network not found for chain selector name: ${evmConfig.chainName}`);
-  }
+  if (!network248)
+    throw new Error(`Network not found: ${evm.chainName}`);
   const evmClient = new cre.capabilities.EVMClient(network248.chainSelector.selector);
-  runtime2.log(`Writing apiValueScaled=${apiValueScaled.toString()} to ${evmConfig.chainName}`);
-  const reportData = encodeAbiParameters([{ name: "apiValue", type: "uint256" }], [apiValueScaled]);
-  const reportResponse = runtime2.report({
-    encodedPayload: hexToBase64(reportData),
+  const payload = encodeAbiParameters([
+    { name: "bankBalanceScaled", type: "uint256" },
+    { name: "approvedIds", type: "uint256[]" }
+  ], [bankBalanceScaled, approvedIds]);
+  const report2 = runtime2.report({
+    encodedPayload: hexToBase64(payload),
     encoderName: "evm",
     signingAlgo: "ecdsa",
     hashingAlgo: "keccak256"
   }).result();
   const resp = evmClient.writeReport(runtime2, {
-    receiver: evmConfig.receiverAddress,
-    report: reportResponse,
-    gasConfig: { gasLimit: evmConfig.gasLimit }
+    receiver: evm.receiverAddress,
+    report: report2,
+    gasConfig: { gasLimit: evm.gasLimit }
   }).result();
   if (resp.txStatus !== TxStatus.SUCCESS) {
-    throw new Error(`Failed to write report: ${resp.errorMessage || resp.txStatus}`);
+    throw new Error(`writeReport failed: ${resp.errorMessage || resp.txStatus}`);
   }
-  const txHash = resp.txHash || new Uint8Array(32);
-  runtime2.log(`Write report txHash: ${bytesToHex(txHash)}`);
-  return bytesToHex(txHash);
-};
-var doPOR = (runtime2) => {
+  runtime2.log(`Write report txHash: ${bytesToHex(resp.txHash || new Uint8Array(32))}`);
+}
+function doWork(runtime2) {
   runtime2.log(`Fetching url ${runtime2.config.url}`);
-  const httpCapability = new cre.capabilities.HTTPClient;
-  const reserveInfo = httpCapability.sendRequest(runtime2, fetchReserveInfo, ConsensusAggregationByFields({
-    totalReserve: median
-  }))(runtime2.config).result();
-  runtime2.log(`ReserveInfo ${safeJsonStringify(reserveInfo)}`);
-  const apiValueScaled = parseUnits(reserveInfo.totalReserve.toString(), 18);
-  runtime2.log(`apiValueScaled ${apiValueScaled.toString()}`);
-  for (const evmConfig of runtime2.config.evms) {
-    writeApiValueReport(evmConfig, runtime2, apiValueScaled);
+  const data = readBatchFromApi(runtime2);
+  const bankBalanceScaled = parseUnits(data.bankBalance.toString(), 18);
+  const ids = data.approvedIds.map((n) => BigInt(n));
+  runtime2.log(`Batch ${safeJson({ bankBalance: data.bankBalance, bankBalanceScaled, approvedIds: data.approvedIds })}`);
+  for (const evm of runtime2.config.evms) {
+    writeReport(evm, runtime2, bankBalanceScaled, ids);
   }
-  return reserveInfo.totalReserve.toString();
-};
-var onCronTrigger = (runtime2, payload) => {
+  return `${data.bankBalance}:${data.approvedIds.length}`;
+}
+function onCron(runtime2, payload) {
   if (!payload.scheduledExecutionTime)
-    throw new Error("Scheduled execution time is required");
+    throw new Error("Scheduled execution time required");
   runtime2.log("Running CronTrigger");
-  return doPOR(runtime2);
-};
+  return doWork(runtime2);
+}
 var initWorkflow = (config) => {
-  const cronTrigger = new cre.capabilities.CronCapability;
-  return [
-    cre.handler(cronTrigger.trigger({
-      schedule: config.schedule
-    }), onCronTrigger)
-  ];
+  const cron = new cre.capabilities.CronCapability;
+  return [cre.handler(cron.trigger({ schedule: config.schedule }), onCron)];
 };
 async function main() {
   const runner = await Runner.newRunner({ configSchema });

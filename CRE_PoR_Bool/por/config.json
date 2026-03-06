@@ -1,9 +1,9 @@
 {
   "schedule": "*/30 * * * * *",
-  "url": "http://localhost:3000/balance",
+  "url": "http://localhost:3000/batch",
   "evms": [
     {
-      "receiverAddress": "0x2A2D3dD5026D0eD10Ee054d35C9d05fA28FA5015",
+      "receiverAddress": "0xd4aB4E495E43F0f1D0c185079Fd8C213E73D652F",
       "chainName": "ethereum-testnet-sepolia",
       "gasLimit": "1000000"
     }
