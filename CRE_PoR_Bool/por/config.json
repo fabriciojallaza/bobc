@@ -3,7 +3,7 @@
   "url": "https://bobc.condordev.xyz/batch",
   "evms": [
     {
-      "receiverAddress": "0x4DE639e6A15A62d95E8dB6102868183b9ECD7d63",
+      "receiverAddress": "0x87ba13aF77c9c37aBa42232B4C625C066a433eeE",
       "chainName": "ethereum-testnet-sepolia",
       "gasLimit": "1000000"
     }
