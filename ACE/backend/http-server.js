@@ -43,8 +43,11 @@ import {
   checkReceiptHash,
   checkBankTxId,
   saveBankTxId,
+  saveCREOrderId,
+  getOrdersByCREId,
+  rejectOrder,
 } from './db.js';
-import { mintTokens, getTotalSupply, getWalletProfile, registerIdentity, computeCredentialHash, freezeWallet, addToSanctions } from './chain.js';
+import { mintTokens, getTotalSupply, getWalletProfile, registerIdentity, computeCredentialHash, freezeWallet, addToSanctions, createCREOrder } from './chain.js';
 
 const HTTP_PORT = Number(process.env.HTTP_PORT) || 3001;
 
@@ -341,6 +344,21 @@ async function handleAdminEmergencyMint(req, res) {
   }
 }
 
+async function handleCRECreateOrder(req, res) {
+  const body = await readBody(req);
+  const { wallet, amount_bs, orderId } = JSON.parse(body);
+  // Check if order already has a cre_order_id (idempotency guard)
+  const existing = getOrderById(orderId);
+  if (existing?.cre_order_id) {
+    return json(res, 200, { ok: true, creOrderId: existing.cre_order_id, cached: true });
+  }
+  const creOrderId = await createCREOrder(wallet, amount_bs);
+  saveCREOrderId(orderId, Number(creOrderId));
+  updateOrderStatus(orderId, 'cre_pending');
+  auditLog('cre_create_order', { wallet, amount_bs, orderId }, { creOrderId: Number(creOrderId) });
+  json(res, 200, { ok: true, creOrderId: Number(creOrderId) });
+}
+
 // ─── OPTIONS preflight ────────────────────────────────────────────────────────
 
 function handleOptions(res) {
@@ -421,7 +439,8 @@ export function createHttpServer() {
         const pendingKyc = getAllKyc().filter(k => k.status === 'pending');
         const allOrders = getAllOrders();
         const pendingOrders = allOrders.filter(o => o.status === 'pending');
-        const confirmedOrders = allOrders.filter(o => o.status === 'confirmed');
+        // Only show 'confirmed' orders (not 'cre_pending' — those already have an on-chain order)
+        const confirmedOrders = allOrders.filter(o => o.status === 'confirmed' && !o.cre_order_id);
         return json(res, 200, {
           pendingKyc,
           pendingOrders,
@@ -435,6 +454,14 @@ export function createHttpServer() {
       }
       if (method === 'POST' && url === '/admin/kyc/reject') {
         return await handleAdminKycReject(req, res);
+      }
+      if (method === 'POST' && url === '/admin/receipt/reject') {
+        const b = await parseBody(req, res);
+        if (!b) return;
+        const { orderId, reason } = b;
+        if (!orderId) return json(res, 400, { error: 'orderId required' });
+        rejectOrder(orderId, reason || 'Comprobante rechazado');
+        return json(res, 200, { ok: true });
       }
       if (method === 'POST' && url === '/admin/receipt/validate') {
         return await handleAdminReceiptValidate(req, res);
@@ -460,6 +487,9 @@ export function createHttpServer() {
       }
       if (method === 'POST' && url === '/admin/emergency-mint') {
         return await handleAdminEmergencyMint(req, res);
+      }
+      if (method === 'POST' && url === '/admin/cre/create-order') {
+        return await handleCRECreateOrder(req, res);
       }
 
       if (method === 'POST' && url === '/admin/kyc/approve') {
