@@ -1,323 +1,228 @@
-# Batch Minting with Dual Controls (Approval List + Proof-of-Reserves) via Chainlink CRE
+# Chainlink CRE in BOBC — What it’s used for, why, and the end-to-end data flow
 
-This document describes the **batch minting module** for a stablecoin issuance flow that combines:
-
-1. **Off-chain approvals** (an allowlist of order IDs that are permitted to mint), and
-2. **Proof-of-Reserves (PoR)** (a strict on-chain balance delta check to ensure reserves match issuance).
-
-The goal is **double assurance**: tokens are minted **only** when (a) an order is approved and (b) the reported reserve/bank balance increase exactly matches the total amount to be issued.
+This section explains **how and why BOBC uses Chainlink CRE (Chainlink Runtime Environment)** as part of the stablecoin issuance system. It’s written to help Chainlink reviewers quickly understand **what CRE is doing**, **what it reads**, **what it writes**, and **how the on-chain contract enforces correctness**.
 
 ---
 
-## High-Level Overview
+## On-chain receiver contract (Sepolia)
 
-Users request tokens by paying fiat and submitting their wallet address + proof of payment. A back-office agent verifies those submissions off-chain. Once a set of orders is approved, a CRE workflow publishes a report on-chain containing:
+BOBC uses a single receiver contract that is the **target of CRE reports**:
 
-* the **current bank/reserve balance**, and
-* the **list of approved order IDs**.
+* **`CRE_BOBC` (Sepolia):** `0x87ba13aF77c9c37aBa42232B4C625C066a433eeE`
 
-A receiver contract validates that:
+```text id="o7ov8p"
+https://sepolia.etherscan.io/address/0x87ba13aF77c9c37aBa42232B4C625C066a433eeE
+```
 
-> **newBalance − lastProcessedBalance == Σ(amounts of approved orders)**
-
-If the equality holds, the contract mints all approved orders (batch) in a single execution, updates the processed balance pointer, and marks orders as processed.
-
-If it doesn’t hold, **nothing mints**.
+This contract implements `IReceiver.onReport(...)` and is designed to accept **CRE-delivered reports** and apply strict rules before minting.
 
 ---
 
-## Components
+## Why BOBC uses CRE
 
-### 1) Smart Contracts (2)
+BOBC issuance depends on **off-chain facts** that cannot be sourced trustlessly on-chain without an oracle-style bridge, such as:
 
-#### A) Mintable ERC-20 Token
+* the current **bank/reserve balance** (Proof-of-Reserves signal),
+* which purchase orders are **approved** after verification (KYC/receipt/bank confirmation).
 
-A standard ERC-20 token with restricted minting:
+CRE is used as the project’s **automation + oracle execution layer** to:
 
-* `mint(to, amount)` can only be called by a configured `minter`.
-* `setMinter(minter)` updates the authorized minter.
+1. **Fetch off-chain state reliably** (HTTP APIs)
+2. **Package that state as an authenticated report**
+3. **Deliver it on-chain** through the CRE forwarder to the receiver
+4. Enable a workflow that is **repeatable**, **auditable**, and **cleanly separated** from business logic
 
-**Role in the system:** token issuance only; does not contain business logic.
-
-#### B) Batch Receiver / Minter: `BatchPoRApprovalMinter`
-
-This is the **only contract** CRE writes to. It has three responsibilities:
-
-1. **Order registry**
-
-   * Stores orders created by your backend/operator:
-
-     * `orderId → {recipient, amount, status}`
-2. **PoR gating**
-
-   * Stores a pointer `lastProcessedBankBalance` to “consume” balance deltas once.
-3. **Batch mint execution**
-
-   * Receives CRE reports containing `(bankBalanceScaled, approvedIds[])`
-   * Validates `delta == sum`
-   * Mints each order in a loop
-   * Marks orders as minted and advances the pointer
-
-**Important constraint:** batch minting is O(n) in the number of approved IDs (loop). A hard cap (`maxIdsPerReport`) is used to avoid out-of-gas failures.
+This makes CRE the glue that turns off-chain verification into **enforceable on-chain actions**, without putting sensitive verification steps on-chain.
 
 ---
 
-### 2) Off-Chain Services (2)
+## What CRE is responsible for in BOBC
 
-#### A) Batch API (Bank Balance + Approved IDs)
+### CRE’s job (high level)
 
-A simple API endpoint that returns:
+CRE does **not** decide who gets minted or how much.
+CRE **transports** a batch snapshot of off-chain truth to the chain in a structured way:
 
-```json
+* **Reserve state**: “What is the bank/reserve balance right now?”
+* **Approval state**: “Which order IDs are approved to mint now?”
+
+### The receiver’s job (on-chain)
+
+The receiver contract (`CRE_BOBC`) performs all enforcement:
+
+* verifies the reserve delta matches the batch mint sum,
+* verifies each order is valid and pending,
+* mints only if the invariant holds,
+* emits a batch event to synchronize the off-chain system.
+
+This separation is intentional: **CRE provides trustworthy delivery; the contract provides deterministic enforcement.**
+
+---
+
+## Off-chain sources CRE reads
+
+BOBC exposes an HTTP endpoint that CRE reads, producing a canonical “batch mint snapshot”.
+
+### Primary endpoint: `/batch`
+
+CRE reads a single endpoint that returns two pieces of information:
+
+1. **`bankBalance`** — integer reserve/bank balance (fiat units, no decimals)
+2. **`approvedIds`** — array of order IDs approved for minting
+
+Example response shape:
+
+```json id="6mehpv"
 {
-  "bankBalance": 150,
+  "bankBalance": 1500,
   "approvedIds": [1, 2]
 }
 ```
 
-* `bankBalance` is an **integer** (no decimals).
-* `approvedIds` is a list of **order IDs** approved by your back-office agent.
+**Semantics**
 
-> The API is the bridge between off-chain verification and on-chain execution.
+* `bankBalance` is the current “source of truth” reserve signal.
+* `approvedIds` is the set of orders cleared by off-chain verification and eligible to mint.
 
-#### B) Chainlink CRE Workflow (TypeScript)
-
-The workflow:
-
-1. Fetches `GET /batch`
-2. Validates types and format
-3. Scales the bank balance to token precision:
-
-   * `bankBalanceScaled = bankBalance * 10^18`
-4. Encodes the on-chain report payload:
-
-   * `abi.encode(uint256 bankBalanceScaled, uint256[] approvedIds)`
-5. Broadcasts the report to the receiver contract using `EVMClient.writeReport`
+> This design keeps complex verification off-chain (receipts, bank confirmation, compliance checks) while still allowing deterministic enforcement on-chain.
 
 ---
 
-## Data Model
+## What CRE writes on-chain
 
-### Order
+CRE writes a report to the receiver contract containing:
 
-Each order is stored on-chain as:
+1. **`bankBalanceScaled`** — `bankBalance` scaled to 18 decimals (EVM-friendly precision)
+2. **`approvedIds`** — the approved order IDs to be minted in the batch
 
-* `orderId` (uint256): unique identifier you assign
-* `recipient` (address): destination wallet
-* `amount` (uint256): token amount in **18 decimals**
-* `status`: `None | Pending | Minted | Cancelled`
-* `createdAt` (uint256): timestamp
+### Report payload encoding
 
-### Reserve Pointer
+The report body is encoded as:
 
-* `lastProcessedBankBalance` (uint256): the last reserve/bank balance that has already been “accounted for” in minting.
+```solidity id="g31pv9"
+abi.encode(uint256 bankBalanceScaled, uint256[] approvedIds)
+```
 
-This prevents double minting from the same reserve amount.
+Where:
 
----
+* `bankBalanceScaled = bankBalance * 10^18`
 
-## Core Invariant (Dual Safety Check)
+The receiver decodes it as:
 
-When the receiver gets a report:
-
-* `newBalance = bankBalanceScaled`
-* `oldBalance = lastProcessedBankBalance`
-* `delta = newBalance - oldBalance`
-* `sum = Σ(order.amount for orderId in approvedIds)`
-
-The transaction must satisfy:
-
-> **delta == sum**
-
-If true, mint and advance.
-If false, revert and mint nothing.
+```solidity id="owgwc2"
+(uint256 bankBalanceScaled, uint256[] memory ids) = abi.decode(report, (uint256, uint256[]));
+```
 
 ---
 
-## End-to-End Flow
+## How CRE triggers minting (the actual flow)
 
-### Step 1 — Create Orders (Pre-Orders)
+Below is the exact logic chain reviewers should understand:
 
-When a user pays fiat and submits their wallet address and proof:
+1. **Off-chain system updates state**
 
-* Your backend assigns `orderId`
-* Your backend/operator submits the order on-chain:
+   * Approves certain orders (IDs) after verification
+   * Updates the bank balance signal (PoR)
 
-`createOrder(orderId, recipient, amountScaled)`
+2. **CRE workflow reads `/batch`**
 
-**Result:** Order becomes `Pending`.
+   * Fetches `{ bankBalance, approvedIds }`
+   * Validates schema / types (sanity checks)
+   * Scales bankBalance → `bankBalanceScaled`
 
----
+3. **CRE workflow writes a report to Sepolia**
 
-### Step 2 — Off-Chain Verification (Approval)
+   * Sends the ABI-encoded payload to the receiver:
 
-Your back-office agent verifies payment off-chain (bank dashboard, payment provider, receipts, internal rules, etc.). When verified:
+     * `CRE_BOBC.onReport(metadata, report)`
 
-* Your system includes the orderId into the approved set (API-side):
+4. **Receiver contract enforces the invariant before minting**
 
-  * `approvedIds = [ ...orderIds that are approved... ]`
+   * Computes:
 
----
+     * `delta = bankBalanceScaled - lastProcessedBankBalance`
+     * `sum = Σ(order.amount for id in approvedIds)`
+   * Requires:
 
-### Step 3 — Reserve Confirmation (PoR)
+     * `delta == sum`
+   * If it matches, mints the batch and advances the pointer:
 
-Your system updates `bankBalance` in the API to the latest reserve balance.
+     * `lastProcessedBankBalance = bankBalanceScaled`
 
-In this design, minting is only possible when the balance delta matches the sum of approved mints.
+5. **Receiver emits a single batch event**
 
----
+   * `BatchMinted(uint256[] orderIds)`
+   * This is intended for off-chain consumption so the API/backend can “consume” approvals (turn them off) only after successful mint.
 
-### Step 4 — CRE Executes On-Chain Report
-
-The CRE workflow runs (cron/manual), publishes `(bankBalanceScaled, approvedIds[])` to the receiver.
-
----
-
-### Step 5 — Receiver Validates and Mints in Batch
-
-On-chain, `BatchPoRApprovalMinter.onReport(...)`:
-
-1. Rejects if balance decreased:
-
-   * `newBalance >= lastProcessedBankBalance`
-2. Rejects if too many IDs:
-
-   * `approvedIds.length <= maxIdsPerReport`
-3. Computes `delta` and `sum`
-4. Requires `delta == sum`
-5. Mints each order:
-
-   * `token.mint(order.recipient, order.amount)`
-6. Marks orders as `Minted`
-7. Updates `lastProcessedBankBalance = newBalance`
+This is how CRE is “used correctly” here: **CRE delivers off-chain truth; the on-chain receiver deterministically enforces it.**
 
 ---
 
-## Precision and Units
+## Why the “delta pointer” model matters (and why CRE is a good fit)
 
-* API uses **integer fiat units** (e.g., `150` Bs).
-* Workflow scales to token precision using `parseUnits(balance, 18)`.
-* Order amounts are stored in **18 decimals**.
+The system uses a pointer:
 
-Examples:
+* `lastProcessedBankBalance`
 
-* 100 Bs → `100000000000000000000`
-* 50 Bs → `50000000000000000000`
-* Sum = 150 Bs → `150000000000000000000`
+instead of comparing against token `totalSupply`. This is important for correctness and replay safety:
 
----
+* CRE reports a *current balance snapshot*.
+* The contract only mints the *difference* between this snapshot and the last processed snapshot.
+* That difference must equal the batch sum exactly.
 
-## Operational Playbook
+This achieves:
 
-### Deployment Checklist
+* **no double-counting** (you can’t mint twice off the same reserve increase),
+* **clean batching** (each report consumes exactly one delta),
+* strong coupling between off-chain reserve changes and on-chain issuance.
 
-1. Deploy **Token**
-2. Deploy **BatchPoRApprovalMinter** with:
-
-   * correct forwarder (MockForwarder for simulate/broadcast; KeystoneForwarder for production)
-   * initial `lastProcessedBankBalance` (typically `0`)
-3. Set token minter:
-
-   * `token.setMinter(batchMinterAddress)`
-4. Configure CRE workflow:
-
-   * `receiverAddress = batchMinterAddress`
-   * `url = http://.../batch`
+CRE is well-suited to this because it can **reliably fetch** and **publish** these snapshots on a schedule, without embedding bank integration logic on-chain.
 
 ---
 
-### Batch Execution Checklist (Day-to-Day)
+## How approvals are handled via CRE (and why)
 
-Before running the workflow:
+Approvals live off-chain because they depend on:
 
-1. Ensure orders exist on-chain and are `Pending`
-2. Ensure API returns:
+* receipt validation,
+* bank transfer reconciliation,
+* operational/compliance logic,
+* potential manual review.
 
-   * `bankBalance` reflecting the actual bank balance
-   * `approvedIds` exactly matching the batch you want to mint
-3. Ensure this equation will hold:
+CRE is used to:
 
-   * `bankBalanceScaled - lastProcessedBankBalance == Σ(amounts of approvedIds)`
+* bring the “approved set” on-chain for the specific batch,
+* in the same report as the reserve snapshot.
 
-Run CRE with broadcast (testnet):
-
-* `cre workflow simulate ... --broadcast`
-
----
-
-## Events and Observability
-
-Recommended events (typical set):
-
-* `OrderCreated(orderId, recipient, amount)`
-* `OrderCancelled(orderId, reason)`
-* `Minted(orderId, recipient, amount)`
-* `BatchProcessed(newBankBalance, delta, sum, count)`
-
-These allow you to build:
-
-* operator dashboards
-* auditing tools
-* auto-removal of processed IDs in your API
+This is crucial: it binds **the approvals list** to **the reserve snapshot** that must reconcile against that list. That coupling is what provides BOBC’s “double safety” gate.
 
 ---
 
-## Security Considerations
+## Key properties reviewers can verify on-chain
 
-### 1) Forwarder-Only Execution
+From the Sepolia contract at:
 
-`onReport` is restricted to the CRE forwarder:
+* `0x87ba13aF77c9c37aBa42232B4C625C066a433eeE`
 
-* prevents arbitrary users from triggering mint
+Reviewers can inspect:
 
-### 2) Non-Partial Minting
+* `onReport` decoding shape: `(uint256, uint256[])`
+* pointer logic: `lastProcessedBankBalance`
+* batch enforcement: `delta == sum`
+* batch event: `BatchMinted(orderIds)`
+* order states: `Pending → Minted`
 
-If *any* order in the batch is invalid (not pending, wrong status, etc.) or if PoR does not match, the entire batch reverts.
-
-This avoids partial state and accounting drift.
-
-### 3) Replay Protection
-
-Orders can only move `Pending → Minted` once.
-Re-sending the same ID again reverts (`NotPending`).
-
-### 4) Gas / Batch Limits
-
-Batch minting loops over IDs. Use:
-
-* `maxIdsPerReport` (e.g., 25)
-* split large batches into multiple reports
-
-### 5) Pause Switch
-
-Admin can pause minting for incidents:
-
-* bad API data
-* suspicious balance changes
-* operational errors
+These are the on-chain enforcement pieces that make the CRE-fed data actionable and safe.
 
 ---
 
-## Troubleshooting Guide
+## Summary
 
-### A) `DeltaMismatch(delta, sum)`
+BOBC uses Chainlink CRE as:
 
-* The reported bank balance delta does not match sum of approved amounts.
-* Fix by:
+* an **oracle execution and automation layer** that fetches off-chain reserve/approval state,
+* packages it as a deterministic report payload,
+* delivers it to an on-chain receiver contract,
+* enabling **batch issuance** that is **strictly constrained** by PoR reconciliation and approval gating.
 
-  * ensuring API `bankBalance` is correct
-  * ensuring approvedIds exactly correspond to the sum you expect
-  * ensuring `lastProcessedBankBalance` is what you think it is
-
-### B) `NotPending(id)`
-
-* The order ID does not exist or is not in `Pending`.
-* Fix by:
-
-  * creating the order first
-  * not reusing already minted/cancelled IDs
-
-### C) No mint occurs, but workflow writes successfully
-
-* Common cause: `approvedIds` empty, or delta mismatch.
-* Verify contract state and events.
+The contract enforces correctness; CRE provides reliable off-chain data delivery.
