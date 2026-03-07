@@ -25,6 +25,8 @@ const PRIVATE_KEY = process.env.PRIVATE_KEY;
 const CCID_REGISTRY_ADDRESS = process.env.CCID_REGISTRY_ADDRESS;
 const POLICY_MANAGER_ADDRESS = process.env.POLICY_MANAGER_ADDRESS;
 const BOBC_ADDRESS = process.env.BOBC_ADDRESS;
+const CRE_BOBC_ADDRESS = process.env.CRE_BOBC_ADDRESS;
+const CRE_ETH_PRIVATE_KEY = process.env.CRE_ETH_PRIVATE_KEY;
 
 // Resolve chain from RPC_URL
 function resolveChain() {
@@ -394,6 +396,87 @@ export async function addToSanctions(wallet) {
   return txHash;
 }
 
+// ─── CRE_BOBC — createOrder ───────────────────────────────────────────────────
+
+const CRE_BOBC_ABI = [
+  {
+    name: 'createOrder',
+    type: 'function',
+    stateMutability: 'nonpayable',
+    inputs: [
+      { name: 'recipient', type: 'address' },
+      { name: 'amount', type: 'uint256' },
+    ],
+    outputs: [{ name: 'orderId', type: 'uint256' }],
+  },
+  {
+    name: 'hasRole',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [
+      { name: 'role', type: 'bytes32' },
+      { name: 'account', type: 'address' },
+    ],
+    outputs: [{ name: '', type: 'bool' }],
+  },
+];
+
+/**
+ * Create a pending on-chain order in CRE_BOBC.
+ * Uses simulateContract to get the returned orderId, then executes the tx.
+ * Returns the on-chain orderId as a Number.
+ */
+export async function createCREOrder(recipient, amount) {
+  if (!CRE_BOBC_ADDRESS) {
+    throw Object.assign(new Error('CRE_BOBC_ADDRESS not configured'), { code: 'CONFIG_ERROR' });
+  }
+  const amountScaled = BigInt(Math.round(amount)) * 10n ** 18n;
+  const publicClient = getPublicClient();
+
+  // Use CRE-specific key if set, otherwise fall back to main key
+  const creKey = CRE_ETH_PRIVATE_KEY
+    ? (CRE_ETH_PRIVATE_KEY.startsWith('0x') ? CRE_ETH_PRIVATE_KEY : `0x${CRE_ETH_PRIVATE_KEY}`)
+    : PRIVATE_KEY;
+  const creAccount = privateKeyToAccount(creKey);
+  const walletClient = createWalletClient({
+    account: creAccount,
+    chain: resolveChain(),
+    transport: http(RPC_URL),
+  });
+
+  // Simulate first to get the returned orderId
+  let orderId;
+  try {
+    const { result, request } = await publicClient.simulateContract({
+      address: CRE_BOBC_ADDRESS,
+      abi: CRE_BOBC_ABI,
+      functionName: 'createOrder',
+      args: [getAddress(recipient), amountScaled],
+      account: creAccount,
+    });
+    orderId = result;
+
+    // Execute the transaction using the validated request
+    const hash = await walletClient.writeContract(request);
+    await publicClient.waitForTransactionReceipt({ hash, confirmations: 1 });
+  } catch (err) {
+    const msg = err.message || '';
+    if (msg.includes('insufficient funds') || msg.includes('InsufficientFundsError')) {
+      const e = new Error('INSUFFICIENT_GAS');
+      e.code = 'INSUFFICIENT_GAS';
+      throw e;
+    }
+    const revertMatch = msg.match(/reverted with reason: "([^"]+)"/);
+    const reason = revertMatch ? revertMatch[1] : msg;
+    const e = new Error(`TX_REVERTED: ${reason}`);
+    e.code = 'TX_REVERTED';
+    e.reason = reason;
+    throw e;
+  }
+
+  return orderId; // bigint
+}
+
 // ─── StablecoinBOB — emergency mint (agent as minter, no CRE) ────────────────
 
 const BOBC_ABI = [
@@ -461,7 +544,7 @@ export async function getWalletProfile(wallet) {
 
 export async function getTotalSupply() {
   if (!BOBC_ADDRESS) return 0;
-  const client = getClient();
+  const client = getPublicClient();
   const raw = await client.readContract({
     address: BOBC_ADDRESS,
     abi: BOBC_ABI,
