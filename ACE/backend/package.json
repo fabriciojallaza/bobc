@@ -1,0 +1,16 @@
+{
+  "name": "bobc-backend",
+  "version": "1.0.0",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "node --watch index.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "better-sqlite3": "^9.0.0",
+    "viem": "^2.0.0",
+    "zod": "^3.0.0"
+  }
+}
