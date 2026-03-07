@@ -70,33 +70,29 @@ flowchart TB
 
 BOBC is a **stablecoin issuance mechanism** with **Proof of Reserve data feeds** and **tokenized asset lifecycle management** (mint, transfer, redeem).
 
-- **ERC-20 stablecoin** with compliance hooks on every `_update()` — [`ACE_Chainlink/src/StablecoinBOB.sol`](ACE_Chainlink/src/StablecoinBOB.sol) (129 lines)
-- **Batch minting** gated by PoR balance delta verification — [`CRE_Chainlink/contracts/abi/CRE_Oracle_minter.sol`](CRE_Chainlink/contracts/abi/CRE_Oracle_minter.sol) (175 lines)
-- **CRE PoR workflow** publishing reserve reports on-chain — [`CRE_Chainlink/por/main.ts`](CRE_Chainlink/por/main.ts) (147 lines)
-- **Fiat deposit oracle** tracking reserves and staleness — [`ACE_Chainlink/src/FiatDepositOracle.sol`](ACE_Chainlink/src/FiatDepositOracle.sol) (84 lines)
-- **Mint flow**: oracle confirmation, reserve check, CCID validation — [`ACE_Chainlink/src/MinterContract.sol`](ACE_Chainlink/src/MinterContract.sol) (135 lines)
-- **Redeem flow**: burn + bank transfer + UIF reporting — [`ACE_Chainlink/src/RedeemContract.sol`](ACE_Chainlink/src/RedeemContract.sol) (166 lines)
+- **CRE `writeReport`** — signs PoR payload and delivers on-chain via `EVMClient.writeReport()` — [`por/main.ts` L65-L110](CRE_Chainlink/por/main.ts)
+- **CRE `onReport` receiver** — enforces `delta == sum` before batch minting — [`CRE_BOBC.sol` L138-L166](ACE_Chainlink/src/CRE_BOBC.sol)
+- **ERC-20 with compliance hook** — `_update()` calls PolicyManager on every transfer — [`StablecoinBOB.sol`](ACE_Chainlink/src/StablecoinBOB.sol)
+- **Mint + Redeem contracts** — [`MinterContract.sol`](ACE_Chainlink/src/MinterContract.sol) | [`RedeemContract.sol`](ACE_Chainlink/src/RedeemContract.sol)
 
 ### Track 2: CRE & AI
 
-A production CRE workflow + an AI agent operating bank processes via MCP.
+A production CRE workflow + an AI agent operating bank processes autonomously.
 
-- **CRE PoR Workflow**: fetch batch API, validate, scale to 18 decimals, `writeReport` — [`CRE_Chainlink/por/main.ts`](CRE_Chainlink/por/main.ts) (147 lines)
-- **AI Agent MCP Server**: 15 tools for bank operations + on-chain admin (Claude as operator) — [`ACE_Chainlink/backend/mcp-server.js`](ACE_Chainlink/backend/mcp-server.js) (1,174 lines)
-- **On-chain interaction layer** (viem): register identity, freeze, sanction, mint — [`ACE_Chainlink/backend/chain.js`](ACE_Chainlink/backend/chain.js) (486 lines)
-- **Backend HTTP API**: KYC, orders, receipts, transparency, batch endpoint for CRE — [`ACE_Chainlink/backend/http-server.js`](ACE_Chainlink/backend/http-server.js) (501 lines)
-- **CRE receiver contract** implementing `IReceiver.onReport()` — [`CRE_Chainlink/contracts/abi/CRE_Oracle_minter.sol`](CRE_Chainlink/contracts/abi/CRE_Oracle_minter.sol) (175 lines)
+- **CRE PoR Workflow** — `CronCapability` → `HTTPClient.sendRequest` → `runtime.report()` → `EVMClient.writeReport` — [`por/main.ts` L38-L140](CRE_Chainlink/por/main.ts)
+- **AI Agent + CRE bridge** — Gemini Vision validates receipts, then calls `cre_create_order` to create on-chain orders for CRE — [`AGENT/index.js` L109-L193](AGENT/index.js)
+- **On-chain order creation** — `CRE_BOBC.createOrder()` via viem — [`chain.js` L399-L460](ACE_Chainlink/backend/chain.js)
+- **BatchMinted event watcher** — listens to CRE_BOBC events, syncs state back — [`watcher/index.js` L30-L54](AGENT/watcher/index.js)
 
 ### Track 3: Risk & Compliance
 
-Full Bolivian regulatory compliance engine enforced on-chain — sanctions, KYC tiers, anti-smurfing, UIF reporting, freezes, and timelocked upgrades.
+Full Bolivian regulatory compliance enforced on-chain — CRE delivers PoR data, contracts enforce invariants.
 
-- **PolicyManager**: KYC-tiered daily limits, sanctions, anti-smurfing (5tx/hr cooldown), auto UIF reports — [`ACE_Chainlink/src/PolicyManager.sol`](ACE_Chainlink/src/PolicyManager.sol) (197 lines)
-- **CCIDRegistry**: Cross-chain identity with KYC tiers (1/2/3), annual expiration, credential uniqueness — [`ACE_Chainlink/src/CCIDRegistry.sol`](ACE_Chainlink/src/CCIDRegistry.sol) (95 lines)
-- **ACE-compatible interfaces** (IPolicyManager, ICCIDRegistry, IFiatDepositOracle) — [`ACE_Chainlink/src/interfaces/IACEInterfaces.sol`](ACE_Chainlink/src/interfaces/IACEInterfaces.sol) (117 lines)
-- **48-hour timelocked** compliance engine upgrades (migration to real ACE) — [`ACE_Chainlink/src/StablecoinBOB.sol`](ACE_Chainlink/src/StablecoinBOB.sol) L82-L100
-- **AI-powered UIF reports** + sanctions management via MCP — [`ACE_Chainlink/backend/mcp-server.js`](ACE_Chainlink/backend/mcp-server.js) (tools: `generate_uif_report`, `add_to_sanctions`, `freeze_wallet`)
-- **55 contract tests** covering all compliance rules — [`ACE_Chainlink/test/`](ACE_Chainlink/test/) (765 lines)
+- **CRE `onReport` PoR invariant** — `delta != sum` reverts, preventing issuance without reserves — [`CRE_BOBC.sol` L138-L166](ACE_Chainlink/src/CRE_BOBC.sol)
+- **PolicyManager (ACE mock)** — KYC-tiered limits, sanctions, anti-smurfing (5tx/hr), auto UIF reports — [`PolicyManager.sol` L57-L96](ACE_Chainlink/src/PolicyManager.sol)
+- **CCIDRegistry (ACE mock)** — on-chain identity with tiers, expiration, credential uniqueness — [`CCIDRegistry.sol`](ACE_Chainlink/src/CCIDRegistry.sol)
+- **48-hour timelock** for compliance engine migration to real ACE — [`StablecoinBOB.sol` L82-L100](ACE_Chainlink/src/StablecoinBOB.sol)
+- **55 contract tests** covering all compliance rules — [`ACE_Chainlink/test/`](ACE_Chainlink/test/)
 
 ---
 
@@ -217,41 +213,23 @@ React SPA for user-facing operations: KYC submission, token purchase, dashboard,
 - **API**: All backend calls via [`frontend/src/app/config/api.ts`](frontend/src/app/config/api.ts)
 - **Pages**: Landing, Buy (KYC + order flow), Dashboard (balances + history), Transparency (reserves + agent activity)
 
-<details>
-<summary><strong>Landing Page</strong> — How it works, real-time data, value props</summary>
+### KYC Flow (AI Agent verifies identity on-chain)
 
-![How It Works](docs/screenshots/2_howitworks.png)
-![Real-Time Data](docs/screenshots/3_realtimedata.png)
+| Submit KYC | Agent Verifying | KYC Approved |
+|:---:|:---:|:---:|
+| ![KYC Form](docs/screenshots/5_verify.png) | ![Verifying](docs/screenshots/6_verifyingidentity.png) | ![Approved](docs/screenshots/7_kycapproved.png) |
 
-</details>
+### Buy Flow (Bank transfer → Agent validates receipt → CRE batch mints)
 
-<details>
-<summary><strong>KYC Flow</strong> — Identity verification via AI agent (on-chain registration)</summary>
+| Place Order | Bank Transfer + Receipt | Agent Processing | BOBC Minted |
+|:---:|:---:|:---:|:---:|
+| ![Buy](docs/screenshots/8_buybobc.png) | ![Transfer](docs/screenshots/9_banktransfer.png) | ![Wait](docs/screenshots/10_waitmint.png) | ![Minted](docs/screenshots/11_bobminted.png) |
 
-![KYC Form](docs/screenshots/5_verify.png)
-![Agent Verifying](docs/screenshots/6_verifyingidentity.png)
-![KYC Approved](docs/screenshots/7_kycapproved.png)
+### Dashboard & Transparency
 
-</details>
-
-<details>
-<summary><strong>Buy Flow</strong> — Place order, bank transfer, agent validates receipt, CRE batch mints</summary>
-
-![Buy BOBC](docs/screenshots/8_buybobc.png)
-![Bank Transfer](docs/screenshots/9_banktransfer.png)
-![Agent Processing](docs/screenshots/10_waitmint.png)
-![BOBC Minted](docs/screenshots/11_bobminted.png)
-
-</details>
-
-<details>
-<summary><strong>Dashboard & Transparency</strong> — Balances, ACE profile, PoR verification, agent activity</summary>
-
-![Dashboard](docs/screenshots/12_dashboard.png)
-![Transparency - Reserves](docs/screenshots/13_transparency1.png)
-![Transparency - Minting Rule](docs/screenshots/14_transparency2.png)
-
-</details>
+| Dashboard | Proof of Reserves | Minting Rule |
+|:---:|:---:|:---:|
+| ![Dashboard](docs/screenshots/12_dashboard.png) | ![Reserves](docs/screenshots/13_transparency1.png) | ![Minting](docs/screenshots/14_transparency2.png) |
 
 ---
 
