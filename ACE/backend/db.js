@@ -100,6 +100,8 @@ function initSchema() {
   try { db.exec('ALTER TABLE orders ADD COLUMN receipt_hash TEXT'); } catch {}
   try { db.exec('ALTER TABLE orders ADD COLUMN bank_tx_id TEXT'); } catch {}
   try { db.exec('ALTER TABLE kyc_requests ADD COLUMN tx_hash TEXT'); } catch {}
+  try { db.exec('ALTER TABLE orders ADD COLUMN cre_order_id INTEGER'); } catch {}
+  try { db.exec('ALTER TABLE orders ADD COLUMN rejection_reason TEXT'); } catch {}
 }
 
 // ─── Bank balance ────────────────────────────────────────────────────────────
@@ -121,11 +123,19 @@ export function resetBankBalance() {
 // ─── KYC ─────────────────────────────────────────────────────────────────────
 
 export function createKycRequest({ wallet, nombre, ci, telefono }) {
-  const stmt = getDb().prepare(`
-    INSERT INTO kyc_requests (wallet, nombre, ci, telefono)
-    VALUES (?, ?, ?, ?)
-  `);
-  return stmt.run(wallet.toLowerCase(), nombre, ci, telefono || null);
+  const w = wallet.toLowerCase();
+  const existing = getDb().prepare('SELECT status FROM kyc_requests WHERE wallet = ?').get(w);
+  if (existing && existing.status === 'rejected') {
+    // Allow resubmission after rejection
+    return getDb().prepare(`
+      UPDATE kyc_requests
+      SET nombre = ?, ci = ?, telefono = ?, status = 'pending', rejection_reason = NULL, tx_hash = NULL, updated_at = unixepoch()
+      WHERE wallet = ?
+    `).run(nombre, ci, telefono || null, w);
+  }
+  return getDb().prepare(`
+    INSERT INTO kyc_requests (wallet, nombre, ci, telefono) VALUES (?, ?, ?, ?)
+  `).run(w, nombre, ci, telefono || null);
 }
 
 export function getKycByWallet(wallet) {
@@ -178,6 +188,12 @@ export function updateOrderStatus(id, status) {
   `).run(status, id);
 }
 
+export function rejectOrder(id, reason) {
+  getDb().prepare(`
+    UPDATE orders SET status = 'rejected', rejection_reason = ?, updated_at = unixepoch() WHERE id = ?
+  `).run(reason, id);
+}
+
 export function confirmOrder(orderId, amount_bs) {
   const tx = getDb().transaction(() => {
     getDb().prepare(`
@@ -190,9 +206,17 @@ export function confirmOrder(orderId, amount_bs) {
 
 export function getConfirmedOrderIds() {
   const rows = getDb()
-    .prepare("SELECT id FROM orders WHERE status = 'confirmed'")
+    .prepare("SELECT cre_order_id FROM orders WHERE status IN ('confirmed', 'cre_pending') AND cre_order_id IS NOT NULL")
     .all();
-  return rows.map(r => r.id);
+  return rows.map(r => r.cre_order_id);
+}
+
+export function saveCREOrderId(orderId, creOrderId) {
+  getDb().prepare('UPDATE orders SET cre_order_id = ? WHERE id = ?').run(creOrderId, orderId);
+}
+
+export function getOrdersByCREId(creOrderId) {
+  return getDb().prepare('SELECT * FROM orders WHERE cre_order_id = ?').get(creOrderId);
 }
 
 export function resetAllOrders() {

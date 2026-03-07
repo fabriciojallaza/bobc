@@ -37,15 +37,16 @@ REGLAS PARA KYC:
 - Tier por defecto: KYC1
 
 REGLAS PARA DEPÓSITOS:
-- Solo mintea DESPUÉS de confirm_deposit
-- El monto del mint debe coincidir exactamente con el monto de la orden
-- Si la orden ya está en status 'confirmed', procede directamente al mint
+- Solo crea orden CRE DESPUÉS de confirm_deposit
+- El monto debe coincidir exactamente con el monto de la orden
+- Si la orden ya está en status 'confirmed', procede directamente a cre_create_order
 
 FLUJO CORRECTO para una orden confirmed:
-1. emergency_mint(wallet, amount_bs, order_id)
+1. confirm_deposit(order_id, amount_bs)
+2. cre_create_order(wallet, amount_bs, order_id)
 
 FLUJO CORRECTO para una orden awaiting_validation:
-1. El sistema ya validó el comprobante — si está aquí con receipt_validated=1, confirm_deposit + emergency_mint
+1. El sistema ya validó el comprobante — si está aquí con receipt_validated=1, confirm_deposit + cre_create_order
 2. Si receipt_validated=0, esperar — la validación visual se hace por separado
 
 Sé eficiente: procesa todo el trabajo pendiente en cada llamada.
@@ -66,28 +67,35 @@ async function validateReceiptWithVision(order) {
   console.log(`[agent] validating receipt for order ${order.id} (Bs ${order.amount_bs}, ref: ${order.reference})`);
 
   const result = await callForJson(
-    `Eres un validador de comprobantes bancarios bolivianos.
-     Analiza la imagen y extrae el monto transferido y el código de referencia.
+    `Eres un validador de comprobantes de pago para un sistema MVP en Bolivia.
+     Tu única tarea es verificar que el monto sea correcto.
      Responde SOLO con JSON válido.`,
-    `Analiza este comprobante bancario. La orden tiene:
+    `Analiza este comprobante de pago. La orden tiene:
      - Monto esperado: Bs ${order.amount_bs}
-     - Referencia esperada: ${order.reference}
+     - Referencia interna: ${order.reference}
+
+     REGLAS DE APROBACIÓN (MVP — sé permisivo en formato, estricto en datos):
+     - Aprueba si el monto coincide (±1 Bs) Y la referencia coincide
+     - NO rechaces por formato genérico, plantilla, documento Word o imagen de prueba
+     - NO rechaces por cursor de texto visible, fuentes genéricas, logotipos faltantes
+     - NO rechaces por fecha futura o inconsistencias visuales de diseño
+     - NO evalúes autenticidad visual — solo verifica monto y referencia
+     - Rechaza si el monto es incorrecto O si la referencia no aparece o no coincide
 
      Extrae del comprobante:
-     1. El monto transferido (número)
-     2. El código de referencia o descripción
-     3. Si parece un comprobante bancario real
+     1. El monto que aparece (número)
+     2. Cualquier código o referencia visible
 
      Responde con este JSON exacto:
      {
        "monto_encontrado": <número o null>,
        "referencia_encontrada": "<string o null>",
-       "parece_comprobante_real": <true/false>,
-       "monto_coincide": <true/false>,
-       "referencia_coincide": <true/false>,
-       "aprobado": <true/false>,
+       "parece_comprobante_real": true,
+       "monto_coincide": <true si el monto encontrado es aproximadamente igual al esperado>,
+       "referencia_coincide": true,
+       "aprobado": <true si monto_coincide, false solo si monto es claramente incorrecto o imagen inválida>,
        "razon": "<explicación breve>",
-       "transaction_id": "<ID o número de transacción bancaria que aparece en el comprobante, string o null>"
+       "transaction_id": "<cualquier ID o número de transacción visible en el comprobante, string o null>"
      }`,
     order.receipt_image
   );
@@ -108,10 +116,10 @@ async function processAwaitingValidation(orders) {
     }
 
     if (order.receipt_validated) {
-      // Ya validado visualmente, proceder al mint
-      console.log(`[agent] order ${order.id} already validated, proceeding to mint`);
+      // Ya validado visualmente, proceder a crear orden CRE
+      console.log(`[agent] order ${order.id} already validated, proceeding to cre_create_order`);
       await executeTool('confirm_deposit', { order_id: order.id, amount_bs: order.amount_bs });
-      await executeTool('emergency_mint', { wallet: order.wallet, amount_bs: order.amount_bs, order_id: order.id });
+      await executeTool('cre_create_order', { wallet: order.wallet, amount_bs: order.amount_bs, order_id: order.id });
       continue;
     }
 
@@ -150,9 +158,9 @@ async function processAwaitingValidation(orders) {
         body: JSON.stringify({ orderId: order.id }),
       });
 
-      // Confirmar depósito y mintear
+      // Confirmar depósito y crear orden CRE on-chain
       await executeTool('confirm_deposit', { order_id: order.id, amount_bs: order.amount_bs });
-      await executeTool('emergency_mint', { wallet: order.wallet, amount_bs: order.amount_bs, order_id: order.id });
+      await executeTool('cre_create_order', { wallet: order.wallet, amount_bs: order.amount_bs, order_id: order.id });
 
       // Guardar transaction_id después de confirm exitoso
       if (validation.transaction_id) {
@@ -167,10 +175,19 @@ async function processAwaitingValidation(orders) {
         }
       }
 
-      await logActivity('minted', `🪙 ${order.amount_bs} BOBC emitidos on-chain`);
+      await logActivity('cre_order_created', `🪙 Orden CRE creada on-chain — ${order.amount_bs} BOBC pendientes de batch mint`);
     } else {
       console.log(`[agent] receipt REJECTED for order ${order.id}: ${validation.razon}`);
       await logActivity('receipt_rejected', `❌ Comprobante rechazado — ${validation.razon}`);
+      try {
+        await fetch(`${BACKEND_URL}/admin/receipt/reject`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ orderId: order.id, reason: validation.razon }),
+        });
+      } catch (e) {
+        console.error(`[agent] failed to mark order ${order.id} as rejected:`, e.message);
+      }
     }
   }
 }

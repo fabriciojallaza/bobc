@@ -91,8 +91,8 @@ export async function executeTool(name, args) {
       return JSON.stringify(result);
     }
 
-    case 'emergency_mint': {
-      const result = await post('/admin/emergency-mint', {
+    case 'cre_create_order': {
+      const result = await post('/admin/cre/create-order', {
         wallet: args.wallet,
         amount_bs: args.amount_bs,
         orderId: args.order_id,
@@ -194,8 +194,8 @@ export const TOOL_DEFINITIONS = [
   {
     type: 'function',
     function: {
-      name: 'emergency_mint',
-      description: 'Mint BOBC tokens to a wallet after deposit is confirmed. Only use after confirm_deposit.',
+      name: 'cre_create_order',
+      description: 'Create a pending on-chain order in CRE_BOBC contract. Call after confirm_deposit. The CRE workflow will batch-mint the tokens automatically.',
       parameters: {
         type: 'object',
         properties: {
