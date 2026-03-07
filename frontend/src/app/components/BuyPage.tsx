@@ -211,6 +211,8 @@ export function BuyPage({ onNavigate }: BuyPageProps) {
     return <KycPendingScreen address={address!} onApproved={(txHash) => {
       setKycStatus('approved');
       setKycTxHash(txHash);
+    }} onRejected={() => {
+      setKycStatus('rejected');
     }} />;
   }
 
@@ -424,7 +426,7 @@ export function BuyPage({ onNavigate }: BuyPageProps) {
                 {/* Receipt Upload */}
                 <div className="mt-6 pt-6 border-t border-border">
                   {orderStatus === 'awaiting_validation' ? (
-                    <ReceiptValidationStatus orderId={orderId!} onMinted={() => setOrderStatus('completed')} />
+                    <ReceiptValidationStatus orderId={orderId!} onMinted={() => setOrderStatus('completed')} onRejected={() => setOrderStatus('receipt')} />
                   ) : (
                     <>
                       <p className="text-sm text-muted-foreground mb-3">
@@ -493,10 +495,11 @@ export function BuyPage({ onNavigate }: BuyPageProps) {
 
 // ─── Receipt Validation Status — polls every 10s, shows agent progress ───────
 
-function ReceiptValidationStatus({ orderId, onMinted }: { orderId: number; onMinted: () => void }) {
+function ReceiptValidationStatus({ orderId, onMinted, onRejected }: { orderId: number; onMinted: () => void; onRejected: (reason: string) => void }) {
   const { address } = useAccount();
   const [status, setStatus] = useState<string>('awaiting_validation');
   const [receiptValidated, setReceiptValidated] = useState(false);
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
   const [dots, setDots] = useState('');
 
   useEffect(() => {
@@ -509,19 +512,47 @@ function ReceiptValidationStatus({ orderId, onMinted }: { orderId: number; onMin
     const poll = async () => {
       try {
         const data = await api.getOrders(address);
-        const order = (data.orders || []).find((o: { id: number; status: string; receipt_validated: number }) => o.id === orderId);
+        const order = (data.orders || []).find((o: { id: number; status: string; receipt_validated: number; rejection_reason?: string }) => o.id === orderId);
         if (!order) return;
         setStatus(order.status);
         setReceiptValidated(!!order.receipt_validated);
         if (order.status === 'minted') {
           onMinted();
+        } else if (order.status === 'rejected') {
+          setRejectionReason(order.rejection_reason || 'Comprobante rechazado.');
+          onRejected(order.rejection_reason || '');
         }
       } catch {}
     };
     poll();
     const interval = setInterval(poll, 10_000);
     return () => clearInterval(interval);
-  }, [address, orderId, onMinted]);
+  }, [address, orderId, onMinted, onRejected]);
+
+  if (rejectionReason) {
+    return (
+      <div className="min-h-screen py-12 md:py-20">
+        <div className="max-w-lg mx-auto px-6 text-center">
+          <div className="bg-card rounded-2xl p-12 border border-border/50 shadow-lg">
+            <div className="w-20 h-20 bg-red-100 dark:bg-red-950 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertCircle className="w-10 h-10 text-red-500" />
+            </div>
+            <h2 className="text-2xl font-semibold text-primary mb-3">Comprobante Rechazado</h2>
+            <p className="text-muted-foreground mb-4">El agente rechazó tu comprobante por el siguiente motivo:</p>
+            <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6 text-red-700 dark:text-red-400 text-sm text-left">
+              {rejectionReason}
+            </div>
+            <button
+              onClick={() => onRejected('')}
+              className="w-full py-3 bg-accent text-white rounded-xl hover:bg-accent/90 transition-all font-medium"
+            >
+              Subir nuevo comprobante
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   const isMinted = status === 'minted';
   const isConfirmed = status === 'confirmed';
@@ -585,8 +616,9 @@ function ReceiptValidationStatus({ orderId, onMinted }: { orderId: number; onMin
 
 // ─── KYC Pending Screen — polls every 10s, redirects on approval ──────────────
 
-function KycPendingScreen({ address, onApproved }: { address: string; onApproved: (txHash: string) => void }) {
+function KycPendingScreen({ address, onApproved, onRejected }: { address: string; onApproved: (txHash: string) => void; onRejected: (reason: string) => void }) {
   const [dots, setDots] = useState('');
+  const [rejectionReason, setRejectionReason] = useState<string | null>(null);
 
   useEffect(() => {
     const dotInterval = setInterval(() => setDots(d => d.length >= 3 ? '' : d + '.'), 600);
@@ -599,13 +631,41 @@ function KycPendingScreen({ address, onApproved }: { address: string; onApproved
         const data = await api.getKycStatus(address);
         if (data.status === 'approved') {
           onApproved(data.tx_hash || '');
+        } else if (data.status === 'rejected') {
+          setRejectionReason(data.rejection_reason || 'Tu solicitud fue rechazada.');
+          onRejected(data.rejection_reason || '');
         }
       } catch {}
     };
     poll();
     const interval = setInterval(poll, 10_000);
     return () => clearInterval(interval);
-  }, [address, onApproved]);
+  }, [address, onApproved, onRejected]);
+
+  if (rejectionReason) {
+    return (
+      <div className="min-h-screen py-12 md:py-20">
+        <div className="max-w-lg mx-auto px-6 text-center">
+          <div className="bg-card rounded-2xl p-12 border border-border/50 shadow-lg">
+            <div className="w-20 h-20 bg-red-100 dark:bg-red-950 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertCircle className="w-10 h-10 text-red-500" />
+            </div>
+            <h2 className="text-2xl font-semibold text-primary mb-3">KYC Rechazado</h2>
+            <p className="text-muted-foreground mb-4">El agente rechazó tu solicitud por el siguiente motivo:</p>
+            <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-xl p-4 mb-6 text-red-700 dark:text-red-400 text-sm text-left">
+              {rejectionReason}
+            </div>
+            <button
+              onClick={() => onRejected('')}
+              className="w-full py-3 bg-accent text-white rounded-xl hover:bg-accent/90 transition-all font-medium"
+            >
+              Intentar de nuevo
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen py-12 md:py-20">
