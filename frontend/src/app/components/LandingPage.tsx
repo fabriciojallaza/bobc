@@ -1,10 +1,50 @@
-import { ArrowRight, Shield, Lock, BarChart3 } from 'lucide-react';
+import { ArrowRight, Shield, Lock, BarChart3, Bot } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { api } from '../config/api';
+
+interface ActivityEntry {
+  type: string;
+  message: string;
+  ts: number;
+}
 
 interface LandingPageProps {
   onNavigate: (page: 'home' | 'buy' | 'dashboard' | 'transparency') => void;
 }
 
+function timeAgo(ts: number) {
+  const diff = Math.floor(Date.now() / 1000) - ts;
+  if (diff < 60) return 'hace un momento';
+  if (diff < 3600) return `hace ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `hace ${Math.floor(diff / 3600)}h`;
+  return `hace ${Math.floor(diff / 86400)}d`;
+}
+
 export function LandingPage({ onNavigate }: LandingPageProps) {
+  const [bankBalance, setBankBalance] = useState<number | null>(null);
+  const [totalSupply, setTotalSupply] = useState<number | null>(null);
+  const [activity, setActivity] = useState<ActivityEntry[]>([]);
+
+  useEffect(() => {
+    api.getTransparency()
+      .then((d: { bankBalance: number; totalSupply: number }) => {
+        setBankBalance(d.bankBalance);
+        setTotalSupply(d.totalSupply);
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    const fetchActivity = () => {
+      api.getActivity()
+        .then((d: { activity: ActivityEntry[] }) => setActivity(d.activity || []))
+        .catch(() => {});
+    };
+    fetchActivity();
+    const interval = setInterval(fetchActivity, 15_000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <div className="min-h-screen flex flex-col">
       {/* Hero Section */}
@@ -125,7 +165,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
           <div className="grid md:grid-cols-3 gap-6 max-w-5xl mx-auto">
             <div className="bg-card rounded-2xl p-8 border border-border/50 shadow-sm">
               <div className="text-sm text-muted-foreground mb-2">Bank Balance</div>
-              <div className="text-3xl font-semibold text-primary mb-1">Bs 12,450,000</div>
+              <div className="text-3xl font-semibold text-primary mb-1">Bs {bankBalance !== null ? bankBalance.toLocaleString() : '—'}</div>
               <div className="text-sm text-accent flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-accent"></div>
                 Verified
@@ -134,7 +174,7 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
 
             <div className="bg-card rounded-2xl p-8 border border-border/50 shadow-sm">
               <div className="text-sm text-muted-foreground mb-2">BOBC Supply</div>
-              <div className="text-3xl font-semibold text-primary mb-1">12,450,000</div>
+              <div className="text-3xl font-semibold text-primary mb-1">{totalSupply !== null ? totalSupply.toLocaleString() : '—'}</div>
               <div className="text-sm text-accent flex items-center gap-1">
                 <div className="w-2 h-2 rounded-full bg-accent"></div>
                 On-chain
@@ -159,6 +199,34 @@ export function LandingPage({ onNavigate }: LandingPageProps) {
               View Full Transparency Report
               <ArrowRight className="w-4 h-4" />
             </button>
+          </div>
+
+          {/* Agent Activity Feed */}
+          <div className="max-w-2xl mx-auto mt-12">
+            <div className="bg-card border border-border/50 rounded-2xl overflow-hidden shadow-sm">
+              <div className="flex items-center gap-2 px-5 py-3 border-b border-border/50 bg-muted/30">
+                <Bot className="w-4 h-4 text-accent" />
+                <span className="text-sm font-medium text-primary">Agente IA — Actividad en tiempo real</span>
+                <span className="ml-auto flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                  <span className="text-xs text-muted-foreground">live</span>
+                </span>
+              </div>
+              <div className="divide-y divide-border/30">
+                {activity.length === 0 ? (
+                  <div className="px-5 py-6 text-sm text-muted-foreground text-center">
+                    🤖 Agente en espera de trabajo...
+                  </div>
+                ) : (
+                  activity.slice(0, 6).map((entry, i) => (
+                    <div key={i} className="flex items-start justify-between gap-4 px-5 py-3">
+                      <span className="text-sm text-primary">{entry.message}</span>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">{timeAgo(entry.ts)}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
           </div>
         </div>
       </section>

@@ -1,9 +1,28 @@
-import { Shield, Building2, Coins, CheckCircle2, TrendingUp } from 'lucide-react';
+import { Shield, Building2, Coins, CheckCircle2, TrendingUp, Loader2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { api } from '../config/api';
+
+interface TransparencyData {
+  bankBalance: number;
+  totalSupply: number;
+  ratio: number;
+}
 
 export function TransparencyPage() {
-  const bankBalance = 12450000;
-  const bobcSupply = 12450000;
-  const collateralRatio = 100;
+  const [data, setData] = useState<TransparencyData | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    api.getTransparency()
+      .then((d: TransparencyData) => setData(d))
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, []);
+
+  const isLoading = loading;
+  const displayBankBalance = data?.bankBalance ?? 0;
+  const bobcSupply = data?.totalSupply ?? 0;
+  const collateralRatio = data?.ratio ?? 100;
 
   return (
     <div className="min-h-screen py-12 md:py-20">
@@ -34,7 +53,11 @@ export function TransparencyPage() {
             </div>
             <div className="mb-2">
               <div className="text-sm text-muted-foreground mb-1">Total Bank Balance</div>
-              <div className="text-4xl font-semibold text-primary">Bs {bankBalance.toLocaleString()}</div>
+              {isLoading ? (
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              ) : (
+                <div className="text-4xl font-semibold text-primary">Bs {displayBankBalance.toLocaleString()}</div>
+              )}
             </div>
             <div className="text-sm text-muted-foreground">
               Banco Nacional de Bolivia
@@ -53,7 +76,11 @@ export function TransparencyPage() {
             </div>
             <div className="mb-2">
               <div className="text-sm text-muted-foreground mb-1">Total BOBC Supply</div>
-              <div className="text-4xl font-semibold text-primary">{bobcSupply.toLocaleString()}</div>
+              {isLoading ? (
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              ) : (
+                <div className="text-4xl font-semibold text-primary">{bobcSupply.toLocaleString()}</div>
+              )}
             </div>
             <div className="text-sm text-muted-foreground">
               On-chain verified
@@ -67,7 +94,7 @@ export function TransparencyPage() {
               </div>
               <div className="flex items-center gap-1 text-xs">
                 <TrendingUp className="w-3 h-3" />
-                Healthy
+                {collateralRatio >= 100 ? 'Healthy' : 'Warning'}
               </div>
             </div>
             <div className="mb-2">
@@ -75,7 +102,7 @@ export function TransparencyPage() {
               <div className="text-4xl font-semibold">{collateralRatio}%</div>
             </div>
             <div className="text-sm text-white/90">
-              Fully collateralized
+              {collateralRatio >= 100 ? 'Fully collateralized' : 'Under-collateralized'}
             </div>
           </div>
         </div>
@@ -83,14 +110,14 @@ export function TransparencyPage() {
         {/* Peg Indicator */}
         <div className="bg-card rounded-2xl p-8 border border-border/50 shadow-sm mb-16">
           <h2 className="text-2xl font-semibold text-primary mb-6">1:1 Peg Status</h2>
-          
+
           <div className="max-w-3xl mx-auto">
             <div className="flex items-center justify-between mb-4">
               <div className="text-center">
-                <div className="text-3xl font-semibold text-primary mb-1">Bs {bankBalance.toLocaleString()}</div>
+                <div className="text-3xl font-semibold text-primary mb-1">Bs {displayBankBalance.toLocaleString()}</div>
                 <div className="text-sm text-muted-foreground">Bank Reserves</div>
               </div>
-              
+
               <div className="flex-1 mx-8 flex items-center">
                 <div className="flex-1 h-2 bg-accent rounded-full"></div>
                 <div className="mx-4 px-4 py-2 bg-accent/10 rounded-full">
@@ -115,7 +142,7 @@ export function TransparencyPage() {
         {/* Mint Rule Explanation */}
         <div className="bg-background rounded-2xl p-8 border border-border/50">
           <h2 className="text-2xl font-semibold text-primary mb-6">Our Minting Rule</h2>
-          
+
           <div className="prose prose-lg max-w-none">
             <p className="text-muted-foreground mb-6">
               BOBC operates on a strict 1:1 backing mechanism to ensure every token is fully collateralized:
@@ -139,14 +166,14 @@ export function TransparencyPage() {
               <div className="bg-card rounded-xl p-6 border border-border/50">
                 <div className="text-sm text-muted-foreground mb-2">Formula</div>
                 <code className="block bg-background px-4 py-3 rounded-lg text-sm font-mono">
-                  Bank Balance ≥ Supply + Order
+                    Bank Balance &ge; Supply + Order
                 </code>
               </div>
 
               <div className="bg-card rounded-xl p-6 border border-border/50">
-                <div className="text-sm text-muted-foreground mb-2">Example</div>
+                <div className="text-sm text-muted-foreground mb-2">Current Values</div>
                 <code className="block bg-background px-4 py-3 rounded-lg text-sm font-mono">
-                  Bs 12,450,000 ≥ 12,450,000 + 0
+                    Bs {displayBankBalance.toLocaleString()} &ge; {bobcSupply.toLocaleString()} + 0
                 </code>
               </div>
             </div>
@@ -201,12 +228,12 @@ export function TransparencyPage() {
             <div>
               <h3 className="text-lg font-semibold text-primary mb-2">Regulatory Compliance</h3>
               <p className="text-muted-foreground mb-4">
-                BOBC is fully regulated by ASFI (Autoridad de Supervisión del Sistema Financiero) in Bolivia. We comply with all local financial regulations and maintain the highest standards of transparency and security.
+                BOBC is fully regulated by ASFI (Autoridad de Supervision del Sistema Financiero) in Bolivia. We comply with all local financial regulations and maintain the highest standards of transparency and security.
               </p>
               <div className="flex gap-4 text-sm text-muted-foreground">
-                <span>• License: FSP-2024-001</span>
-                <span>• Audited: Q1 2026</span>
-                <span>• Jurisdiction: Bolivia</span>
+                <span>- License: FSP-2024-001</span>
+                <span>- Audited: Q1 2026</span>
+                <span>- Jurisdiction: Bolivia</span>
               </div>
             </div>
           </div>
