@@ -7,3 +7,12 @@ CRE_PoR/.env
 ACE/.env
 **/.env
 **/.env.local
+
+# Build artifacts
+ACE/cache/
+ACE/out/build-info/
+ACE/backend/bobc.db
+ACE/backend/node_modules/
+ACE/backend/package-lock.json
+AGENT/node_modules/
+AGENT/package-lock.json
