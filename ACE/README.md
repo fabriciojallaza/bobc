@@ -1,276 +1,183 @@
-# 🇧🇴 BOBs — Peso Boliviano Tokenizado con Compliance Regulatorio Onchain
+# BOBC — Digital Boliviano Stablecoin
 
-> **Chainlink ACE + CRE | Base (Coinbase L2) | Hackathon MVP**
-
-**BOBs** es un stablecoin ERC-20 pegged 1:1 al Boliviano (BOB), con compliance regulatorio boliviano **enforced onchain** usando Chainlink ACE (mock migrable) y Chainlink CRE como puente fiat-blockchain.
+ERC-20 stablecoin pegged 1:1 to the Bolivian Boliviano (Bs), with KYC compliance enforced on-chain via a Chainlink ACE-compatible registry and Chainlink CRE as the fiat-to-blockchain minting bridge.
 
 ---
 
-## 🔴 El Problema
+## The Problem
 
-Bolivia esta en la **lista gris del FATF/GAFI** desde 2020. Esto significa:
-
-- 🏦 **Capital atrapado**: bolivianos no pueden acceder a DeFi ni a servicios financieros globales
-- 📋 **Compliance manual**: los bancos bolivianos gastan millones en procesos KYC/AML manuales
-- 🚫 **Sin stablecoins locales**: USDT/USDC no resuelven el problema regulatorio boliviano
-- ⚖️ **Regulacion estricta**: la UIF (Unidad de Investigaciones Financieras) exige reportes automaticos para transacciones >= Bs 34,500
-
-**No existe un stablecoin que cumpla la regulacion boliviana onchain.** Hasta ahora.
+Bolivia has been on the FATF grey list since 2020. Bolivians cannot access DeFi, and banks spend millions on manual KYC/AML. No stablecoin enforces Bolivian regulatory rules on-chain — until now.
 
 ---
 
-## 💡 La Solucion
-
-BOBs tokeniza el Boliviano con **todas las reglas de compliance embedded en smart contracts**, eliminando la necesidad de compliance manual y habilitando acceso a DeFi para bolivianos de forma regulada.
-
-### Flujo Completo
+## System Overview
 
 ```
-                        MINT FLOW
-  ┌─────────┐    ┌───────────┐    ┌────────────────┐    ┌───────────────┐
-  │  Banco  │───>│ CRE Oracle│───>│ FiatDeposit    │───>│ MinterContract│
-  │  (fiat) │    │ (confirm) │    │ Oracle         │    │ (mint BOBs)   │
-  └─────────┘    └───────────┘    └────────────────┘    └───────┬───────┘
-                                                                │
-                                                                v
-  ┌─────────┐    ┌───────────┐    ┌────────────────┐    ┌───────────────┐
-  │  User   │<───│StablecoinBOB│<──│ PolicyManager  │<───│  CCIDRegistry │
-  │ (wallet)│    │ (_update)  │   │ (ACE mock)     │    │  (KYC/CCID)   │
-  └─────────┘    └───────────┘    └────────────────┘    └───────────────┘
-
-                       TRANSFER FLOW
-  ┌─────────┐  transfer()  ┌───────────────┐  checkTransfer()  ┌───────────────┐
-  │ Sender  │─────────────>│ StablecoinBOB │──────────────────>│ PolicyManager │
-  │ (KYC'd) │              │  _update hook │                   │ limits/sanctions│
-  └─────────┘              └───────┬───────┘                   │ anti-smurfing  │
-                                   │                           └───────┬───────┘
-                                   v                                   │
-                           ┌───────────────┐                           │
-                           │  Receiver     │<─── PASS ─────────────────┘
-                           │  (KYC'd)      │     or REVERT
-                           └───────────────┘
-
-                       REDEEM FLOW
-  ┌─────────┐  redeem()  ┌───────────────┐  burn  ┌───────────────┐  CRE  ┌───────┐
-  │  User   │───────────>│RedeemContract │──────>│ StablecoinBOB │──────>│ Banco │
-  │ (BOBs)  │            │ (compliance)  │       │ (burn tokens) │      │ (fiat) │
-  └─────────┘            └───────────────┘       └───────────────┘      └───────┘
+  User
+   │ wallet + KYC form
+   ▼
+  Frontend (React/Wagmi)
+   │ REST
+   ▼
+  Backend (Node.js)  ◄──── Agent loop (30s) ◄──── Claude LLM + Gemini Vision
+   │ viem
+   ├──► CCIDRegistry     — Chainlink ACE-compatible identity registry
+   ├──► PolicyManager    — compliance rules (KYC limits, sanctions, anti-smurfing)
+   └──► CRE_BOBC         — Chainlink CRE receiver contract
+             │ onReport()
+             └──► StablecoinBOBC.mint()
 ```
 
 ---
 
-## 🏗️ Stack Tecnologico
+## How Chainlink ACE is Used
 
-| Componente | Tecnologia |
-|-----------|------------|
-| Smart Contracts | Solidity ^0.8.24 |
-| Framework | Foundry (forge, cast, anvil) |
-| Blockchain | Base (Coinbase L2) |
-| Oracle Fiat | Chainlink CRE (Compute Runtime Environment) |
-| Compliance Engine | Chainlink ACE mock (migrable a ACE real) |
-| Librerias | OpenZeppelin Contracts v5 (ERC20, AccessControl, Pausable, ReentrancyGuard) |
-| AI Agent | Claude MCP (Bank operations) |
+ACE provides the on-chain identity and compliance layer. In this MVP, **CCIDRegistry** and **PolicyManager** are ACE-compatible mocks — they implement the same interfaces and can be swapped for Chainlink ACE production contracts without changing the token.
 
----
+### CCIDRegistry (Identity)
 
-## 📦 Contratos (6)
+Every wallet that wants to hold or transfer BOBC must be registered in `CCIDRegistry`. The agent calls `registerIdentity()` after AI-based KYC approval:
 
-| Contrato | Archivo | Rol |
-|----------|---------|-----|
-| **StablecoinBOB** | `src/StablecoinBOB.sol` | ERC-20 "BOBs" con hook `_update()` que enforces compliance en cada transfer, mint y burn |
-| **PolicyManager** | `src/PolicyManager.sol` | Motor de compliance: limites KYC, sanciones, anti-smurfing, reportes UIF. **ACE mock** |
-| **CCIDRegistry** | `src/CCIDRegistry.sol` | Registro de identidades cross-chain. Vincula wallets a credenciales KYC con tiers y expiracion |
-| **MinterContract** | `src/MinterContract.sol` | Mintea BOBs tras confirmacion del CRE oracle. Valida CCID, reservas, limites, anti-double-mint |
-| **RedeemContract** | `src/RedeemContract.sol` | Burn de BOBs + solicitud de transferencia bancaria. Compliance check + reporte UIF automatico |
-| **FiatDepositOracle** | `src/FiatDepositOracle.sol` | Oracle CRE mock: confirma depositos fiat, trackea reservas, previene depositos duplicados |
-
----
-
-## 🇧🇴 Reglas de Negocio Bolivia
-
-### KYC Tiers y Limites Diarios
-
-| Tier | Descripcion | Limite Diario | Ejemplo |
-|------|------------|---------------|---------|
-| **KYC1** | Persona natural, CI verificada | **Bs 5,000** | Remesas, pagos cotidianos |
-| **KYC2** | Persona con verificacion reforzada | **Bs 34,000** | Comerciantes, freelancers |
-| **KYC3** | Empresa con vLEI | **Bs 500,000** | Importadores, corporativos |
-
-### Controles Anti-Lavado
-
-| Regla | Parametro | Descripcion |
-|-------|-----------|-------------|
-| 🚨 **Umbral UIF** | `>= Bs 34,500` | Reporte automatico via evento `UIFReport` a la Unidad de Investigaciones Financieras |
-| 🛡️ **Anti-Smurfing** | `5 tx/hora` | Al alcanzar 5 transacciones en una hora, se activa cooldown automatico |
-| ⏳ **Cooldown** | `2 horas` | Periodo de bloqueo tras activacion anti-smurfing |
-| 🔒 **Sanciones** | OFAC + UIF | Wallets sancionadas no pueden enviar, recibir, mintear ni redimir |
-| ❄️ **Freeze** | Admin | Congelamiento de wallets por orden judicial o investigacion |
-| 📅 **CCID Expiracion** | `365 dias` | Identidades expiran anualmente, requieren renovacion |
-| 🏭 **Max Mint** | `Bs 500,000` | Limite por operacion de minteo individual |
-| ⏰ **Deposit Validity** | `24 horas` | Depositos fiat confirmados deben mintearse dentro de 24h |
-| 💰 **Min Redeem** | `Bs 100` | Monto minimo para redenciones |
-
----
-
-## 🔗 Integracion ACE (Chainlink)
-
-**PolicyManager** y **CCIDRegistry** son **mocks compatibles** con la interfaz de Chainlink ACE. Esto permite:
-
-1. **Hoy (MVP)**: compliance enforcement via contratos propios
-2. **Manana (Produccion)**: migracion a ACE real sin cambiar StablecoinBOB
-
-### Migracion a ACE Real
-
-```
-StablecoinBOB.updateCompliance(aceRealAddress)
-    │
-    ├── ⏳ Timelock: 48 horas de espera obligatoria
-    │
-    └── StablecoinBOB.executePolicyManagerUpdate()
-         └── policyManager = ACE real ✅
+```solidity
+CCIDRegistry.registerIdentity(wallet, tier, credentialHash)
+// credentialHash = keccak256(abi.encodePacked(wallet, ci))
+// tier: 1=KYC1 (Bs 5,000/day), 2=KYC2 (Bs 34,000/day), 3=KYC3 (Bs 500,000/day)
+// expires after 365 days
 ```
 
-El **timelock de 48 horas** protege contra cambios maliciosos: la comunidad tiene 2 dias para auditar cualquier cambio de compliance engine.
+### PolicyManager (Compliance Hook)
 
-> 📄 Guia completa: [`docs/ACE_INTEGRATION_GUIDE.md`](docs/ACE_INTEGRATION_GUIDE.md)
+Every ERC-20 transfer, mint, and burn goes through `StablecoinBOBC._update()`:
+
+```solidity
+function _update(address from, address to, uint256 amount) internal override {
+    policyManager.checkTransfer(from, to, amount);   // revert if non-compliant
+    super._update(from, to, amount);
+    policyManager.recordTransfer(from, to, amount);  // anti-smurfing + UIF tracking
+}
+```
+
+`checkTransfer` enforces: valid CCID on both sides, daily KYC tier limit, no frozen/sanctioned wallets, anti-smurfing (5 tx/hour cooldown), and auto `UIFReport` event for amounts >= Bs 34,500.
+
+### Migration to ACE Production
+
+```solidity
+StablecoinBOBC.updateCompliance(aceRealAddress)
+// 48-hour timelock → then:
+StablecoinBOBC.executePolicyManagerUpdate()
+```
+
+The token never changes — only the compliance engine address.
 
 ---
 
-## 🌐 Integracion CRE (Chainlink)
+## How Chainlink CRE is Used
 
-El Chainlink CRE (Compute Runtime Environment) actua como **puente entre el sistema bancario boliviano y la blockchain**.
+CRE bridges Boliviano bank deposits to on-chain minting. The flow has three actors: the AI agent, the backend `/batch` endpoint, and the CRE_BOBC contract.
 
-### 3 Jobs del CRE
+### CRE_BOBC Contract
 
-| Job | Trigger | Accion |
-|-----|---------|--------|
-| **FiatDepositConfirmation** | Deposito bancario detectado | Confirma deposito en `FiatDepositOracle` → habilita mint |
-| **ProofOfReserves** | Cada 24h | Actualiza `totalReserves` en el oracle → garantiza colateral 1:1 |
-| **RedeemExecution** | Evento `RedeemRequested` | Ejecuta transferencia bancaria al usuario → confirma onchain |
+`CRE_BOBC` implements the Chainlink CRE `IReceiver` interface:
 
-> 📄 Especificacion completa: [`docs/CRE_SPEC.md`](docs/CRE_SPEC.md)
-
----
-
-## 🤖 Bank Agent MCP
-
-Un agente AI (Claude) opera como **administrador del dia a dia** del sistema via MCP (Model Context Protocol):
-
-- 🪪 **Gestion de identidades**: registra/revoca CCIDs, asigna tiers KYC
-- ❄️ **Freeze/Unfreeze**: congela wallets por orden judicial
-- 🚫 **Sanciones**: agrega/remueve wallets de la lista OFAC+UIF
-- 📊 **Monitoreo**: supervisa depositos, redenciones, alertas UIF
-- 🏦 **Bank operations**: linkea cuentas bancarias, confirma redenciones
-
-> 📄 Especificacion completa: [`docs/BANK_MCP_SPEC.md`](docs/BANK_MCP_SPEC.md)
-
----
-
-## 🚀 Quick Start
-
-### Prerrequisitos
-
-- [Foundry](https://book.getfoundry.sh/getting-started/installation) instalado
-
-### Instalacion
-
-```bash
-git clone <repo-url>
-cd ACE
-forge install
+```solidity
+interface IReceiver {
+    function onReport(bytes calldata metadata, bytes calldata report) external;
+}
 ```
 
-### Compilar
+`onReport` is called by the Chainlink CRE forwarder after reading the `/batch` data feed. It validates that the bank balance delta matches the sum of the approved order amounts, then mints:
 
-```bash
-forge build
+```solidity
+function onReport(bytes calldata, bytes calldata report) external onlyForwarder {
+    (uint256 bankBalanceScaled, uint256[] memory ids) = abi.decode(report, (uint256, uint256[]));
+
+    uint256 delta = bankBalanceScaled - lastProcessedBankBalance;
+    uint256 sum = 0;
+    for (uint256 i = 0; i < ids.length; i++) {
+        sum += orders[ids[i]].amount;
+    }
+    if (delta != sum) revert DeltaMismatch(delta, sum);  // proof of reserves check
+
+    for (uint256 i = 0; i < ids.length; i++) {
+        orders[ids[i]].status = Status.Minted;
+        token.mint(orders[ids[i]].recipient, orders[ids[i]].amount);
+    }
+    emit BatchMinted(ids);
+    lastProcessedBankBalance = bankBalanceScaled;
+}
 ```
 
-### Tests
+### /batch Data Feed
 
-```bash
-forge test -vvv
+The CRE job polls `GET /batch` every 10 seconds to decide what to report:
+
+```json
+{ "bankBalance": 100, "approvedIds": [1, 2] }
 ```
 
-### Deploy (Base Sepolia)
+- `bankBalance` — total Bolivianos held in the custodian bank account
+- `approvedIds` — on-chain order IDs (assigned by `CRE_BOBC.createOrder()`) ready to be minted
 
-```bash
-# Configurar variables de entorno
-export PRIVATE_KEY=<tu-private-key>
-export RPC_URL=<base-sepolia-rpc-url>
+### Order Lifecycle
 
-# Deploy completo
-forge script script/Deploy.s.sol --rpc-url $RPC_URL --broadcast --private-key $PRIVATE_KEY
+```
+Agent validates receipt
+       │
+       ▼
+POST /admin/cre/create-order
+  → CRE_BOBC.createOrder(recipient, amount)   [on-chain, OPERATOR_ROLE]
+  → returns orderId (contract-assigned, sequential)
+       │
+       ▼
+/batch returns approvedIds: [orderId]
+       │
+       ▼
+CRE calls onReport(bankBalanceScaled, [orderId])
+  → delta == order.amount → mint ✅
+       │
+       ▼
+BatchMinted event → watcher → SQLite status = 'minted' → frontend updates
 ```
 
 ---
 
-## ✅ Tests
+## KYC Flow (Agent + ACE)
+
+### Step-by-step
+
+1. User submits name, CI (national ID), and wallet address via the frontend
+2. Backend stores the request in SQLite with `status = 'pending'`
+3. The agent loop (every 30s) calls `GET /admin/pending` — if KYC requests exist, it sends them to Claude
+4. Claude evaluates name completeness and CI format, then calls `approve_kyc` or `reject_kyc`
+5. On approval: backend computes `credentialHash = keccak256(wallet, ci)` and calls `CCIDRegistry.registerIdentity()` on Sepolia
+6. SQLite updated with `status = 'approved'` and the on-chain `tx_hash`
+7. Frontend polling detects `approved` → shows Etherscan link → redirects to buy form
+
+On rejection: SQLite updated with reason, no on-chain tx. User can resubmit — backend does an UPSERT from `rejected` back to `pending`.
+
+### Receipt Validation (Gemini Vision)
+
+For deposit receipts, the agent uses Gemini Vision instead of Claude (image analysis):
 
 ```
-55 tests, 0 failures
+Gemini receives: receipt image + expected amount + expected reference code
+Gemini returns: { monto_coincide, referencia_coincide, aprobado, razon }
 ```
 
-### Cobertura por Contrato
-
-| Suite | Tests | Cobertura |
-|-------|-------|-----------|
-| `CCIDRegistry.t.sol` | Registro, revocacion, expiracion, credential unico, tiers | Identidad completa |
-| `PolicyManager.t.sol` | Limites KYC1/2/3, sanciones, freeze, cooldown, anti-smurfing, UIF | Compliance completa |
-| `StablecoinBOB.t.sol` | Mint, burn, transfer con compliance hooks, timelock, pause | Token + hooks |
-| `MinterContract.t.sol` | Mint valido, doble-mint, deposit expirado, reservas insuficientes, CCID invalido | Mint flow |
-| `RedeemContract.t.sol` | Redeem valido, minimo, sin banco, UIF report, force redeem | Redeem flow |
-| `Integration.t.sol` | Flujo completo mint-transfer-redeem, multi-tier, escenarios edge | End-to-end |
+If approved: agent calls `confirm_deposit` then `cre_create_order`.
+If rejected: backend marks order `status = 'rejected'` with reason. Frontend shows the rejection message and offers a retry.
 
 ---
 
-## 🗺️ Roadmap v2
+## Contracts (Sepolia)
 
-| Feature | Descripcion | Prioridad |
-|---------|------------|-----------|
-| 🔗 **CCIP Cross-Chain** | Transferencias BOBs entre Base, Ethereum, Arbitrum via Chainlink CCIP | Alta |
-| 🏛️ **ACE Real** | Migracion de PolicyManager mock a Chainlink ACE production | Alta |
-| 👥 **Multisig** | Governance via Safe multisig para operaciones admin criticas | Media |
-| 🇧🇴 **Jurisdiccion (TX-6)** | Validacion de jurisdiccion boliviana en identidades CCID | Media |
-| 📊 **Dashboard** | Panel de monitoreo para UIF, volumes, alertas en tiempo real | Baja |
-| 🏦 **Multi-banco** | Soporte para multiples bancos custodios con failover | Baja |
+| Contract | Address | Verified |
+|----------|---------|----------|
+| StablecoinBOBC | `0xf132Ba93754206DF89E61B43A9800498B7062C13` | ✅ |
+| PolicyManager | `0x1C57A01B0e1F95848b22f31e8F90E9B07728DfE9` | ✅ |
+| CCIDRegistry | `0x9968C2C127d3d88DE61c87050aE3Ef398EaF9719` | ✅ |
+| CRE_BOBC | `0x87ba13aF77c9c37aBa42232B4C625C066a433eeE` | — |
 
 ---
 
-## 📐 Arquitectura de Seguridad
-
-- 🔐 **ReentrancyGuard** en todas las operaciones de mint/burn/redeem
-- 🎭 **AccessControl** con roles granulares (ADMIN, MINTER, ORACLE, OPERATOR, REGISTRAR)
-- ⏳ **Timelock 48h** en todos los cambios de contratos criticos (oracle, policyManager, ccidRegistry)
-- ⏸️ **Pausable** global para emergencias
-- 🚫 **Anti-double-mint**: depositos marcados como `used` tras mint
-- 📊 **Proof of Reserves**: mint bloqueado si reservas insuficientes o stale (>24h)
-- 🏦 **Bank License**: kill switch para detener todo minteo
-
----
-
-## 📄 Documentacion
-
-| Documento | Descripcion |
-|-----------|-------------|
-| [`docs/CRE_SPEC.md`](docs/CRE_SPEC.md) | Especificacion del Chainlink CRE Oracle (3 jobs) |
-| [`docs/BANK_MCP_SPEC.md`](docs/BANK_MCP_SPEC.md) | Especificacion del Bank Agent MCP (Claude AI) |
-| [`docs/ACE_INTEGRATION_GUIDE.md`](docs/ACE_INTEGRATION_GUIDE.md) | Guia de integracion con Chainlink ACE |
-| [`docs/VALIDATION_REPORT.md`](docs/VALIDATION_REPORT.md) | Reporte de validacion: 26 PASS, 4 PARCIAL, 1 FAIL |
-
----
-
-## 🏆 Por que BOBs?
-
-1. **Production-ready architecture**: no es un demo, es un MVP desplegable con compliance real
-2. **Regulacion boliviana onchain**: primer stablecoin que implementa reglas UIF/FATF en smart contracts
-3. **Chainlink-native**: ACE para compliance, CRE para oracle fiat, CCIP-ready para cross-chain
-4. **AI-operated**: agente Claude gestiona operaciones bancarias via MCP
-5. **Upgrade path claro**: mock → ACE real sin cambiar la logica del token
-
----
-
-<p align="center">
-  <b>Built for Chainlink Hackathon 2026</b><br>
-  <i>Bringing Bolivia onchain, compliantly. 🇧🇴</i>
-</p>
+Built for Chainlink Hackathon 2026
