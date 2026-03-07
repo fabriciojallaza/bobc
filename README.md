@@ -10,6 +10,10 @@ Bolivia has been on the **FATF grey list since 2020** — Bolivians cannot acces
 
 ![BOBC Landing](docs/screenshots/1_menu.png)
 
+### Business Model
+
+BOBC is free to mint and redeem at a 1:1 rate. Revenue comes from deploying idle reserves into low-risk, regulated yield instruments (government bonds, overnight repos) — the same model used by major stablecoins. As adoption grows, the spread between reserve yield and zero-cost minting sustains operations, compliance infrastructure, and further development — all while maintaining full 1:1 collateralization at all times.
+
 ---
 
 ## Table of Contents
