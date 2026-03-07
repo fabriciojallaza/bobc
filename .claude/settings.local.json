@@ -3,7 +3,12 @@
     "allow": [
       "Bash(ls:*)",
       "Bash(echo EXIT:$?:*)",
-      "Bash(pnpm run:*)"
+      "Bash(pnpm run:*)",
+      "WebFetch(domain:chain.link)",
+      "Bash(find:*)",
+      "Bash(xargs wc:*)",
+      "Bash(wc:*)",
+      "mcp__ide__getDiagnostics"
     ]
   }
 }

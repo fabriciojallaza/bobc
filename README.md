@@ -1,0 +1,404 @@
+# BOBs - Tokenized Boliviano with On-Chain Regulatory Compliance
+
+> **Convergence: A Chainlink Hackathon | February - March 2026**
+>
+> Tracks: **DeFi & Tokenization** | **CRE & AI** | **Risk & Compliance**
+
+BOBs is a **production-ready stablecoin** pegged 1:1 to the Bolivian Peso (BOB) with full regulatory compliance enforced on-chain. It combines **Chainlink CRE** for fiat-blockchain bridging, **Chainlink ACE-compatible** smart contracts for compliance enforcement, and an **AI Agent (Claude MCP)** that operates bank-side processes autonomously.
+
+Bolivia has been on the **FATF grey list since 2020** — Bolivians cannot access DeFi, banks spend millions on manual KYC/AML, and no stablecoin satisfies local regulation. BOBs solves this by embedding every Bolivian compliance rule directly into smart contracts, making regulatory enforcement automatic, transparent, and auditable.
+
+---
+
+## Table of Contents
+
+- [System Architecture](#system-architecture)
+- [Hackathon Track Mapping](#hackathon-track-mapping)
+- [CRE Workflows](#cre-workflows)
+- [Smart Contracts (ACE)](#smart-contracts-ace)
+- [AI Agent (MCP)](#ai-agent-mcp)
+- [Frontend](#frontend)
+- [Deployed Contracts](#deployed-contracts)
+- [Lines of Code](#lines-of-code)
+- [Getting Started](#getting-started)
+- [Tests](#tests)
+- [Documentation](#documentation)
+- [Repository Structure](#repository-structure)
+
+---
+
+## System Architecture
+
+```mermaid
+flowchart TB
+    subgraph OFF["Off-Chain"]
+        USER["User\n(Bolivian Bank Account)"]
+        API["Backend API\nGET /batch\nbankBalance + approvedIds"]
+        MCP["AI Agent (Claude + Gemini Vision)\nMCP Server — 15 tools\n30s agent loop\nKYC, receipts, sanctions, UIF"]
+        UIF["Bolivia UIF\n(Regulator)"]
+    end
+
+    subgraph CRE["Chainlink CRE"]
+        POR["PoR Workflow\npor/main.ts\nFetch → Validate → Scale → writeReport"]
+        NAV["NAV Workflow\nnav/main.ts\nFetch NAV → Median DON Consensus → writeReport"]
+    end
+
+    subgraph CHAIN["Blockchain (Sepolia / Base)"]
+        BOBC["CRE_BOBC\nBatchPoRApprovalMinter\nonReport(): delta == sum → batch mint"]
+        TOKEN["StablecoinBOBC (ERC-20)\n_update() → compliance hook"]
+        POLICY["PolicyManager (ACE mock)\nKYC limits · Sanctions\nAnti-smurfing · UIF events"]
+        CCID["CCIDRegistry\nKYC tiers · Expiration\nCredential uniqueness"]
+        DFC["DataFeedsCache\n(Chainlink)\nSepolia + Base Sepolia"]
+    end
+
+    USER -- "1. Pay fiat" --> API
+    API -- "2. bankBalance + approvedIds" --> POR
+    MCP -- "3. Verify payment,\nregister KYC" --> CCID
+    MCP -- "freeze / sanction" --> POLICY
+    POR -- "4. Signed report" --> BOBC
+    BOBC -- "5. Batch mint" --> TOKEN
+    TOKEN -- "Every transfer" --> POLICY
+    POLICY -- "Check KYC" --> CCID
+    POLICY -- "UIFReport event\n≥ Bs 34,500" --> UIF
+    NAV -- "6. NAV feed" --> DFC
+```
+
+---
+
+## Hackathon Track Mapping
+
+### Track 1: DeFi & Tokenization
+
+BOBs is a **stablecoin issuance mechanism** with **Proof of Reserve data feeds** and **tokenized asset lifecycle management** (mint, transfer, redeem).
+
+- **ERC-20 stablecoin** with compliance hooks on every `_update()` — [`ACE/src/StablecoinBOB.sol`](ACE/src/StablecoinBOB.sol) (129 lines)
+- **Batch minting** gated by PoR balance delta verification — [`CRE_PoR_Bool/contracts/abi/CRE_Oracle_minter.sol`](CRE_PoR_Bool/contracts/abi/CRE_Oracle_minter.sol) (175 lines)
+- **CRE PoR workflow** publishing reserve reports on-chain — [`CRE_PoR_Bool/por/main.ts`](CRE_PoR_Bool/por/main.ts) (147 lines)
+- **CRE NAV workflow** writing to Chainlink DataFeedsCache — [`CRE_PoR_Bool/nav/main.ts`](CRE_PoR_Bool/nav/main.ts) (241 lines)
+- **Fiat deposit oracle** tracking reserves and staleness — [`ACE/src/FiatDepositOracle.sol`](ACE/src/FiatDepositOracle.sol) (84 lines)
+- **Mint flow**: oracle confirmation, reserve check, CCID validation — [`ACE/src/MinterContract.sol`](ACE/src/MinterContract.sol) (135 lines)
+- **Redeem flow**: burn + bank transfer + UIF reporting — [`ACE/src/RedeemContract.sol`](ACE/src/RedeemContract.sol) (166 lines)
+
+### Track 2: CRE & AI
+
+Two production CRE workflows + an AI agent operating bank processes via MCP.
+
+- **CRE PoR Workflow**: fetch batch API, validate, scale to 18 decimals, `writeReport` — [`CRE_PoR_Bool/por/main.ts`](CRE_PoR_Bool/por/main.ts) (147 lines)
+- **CRE NAV Workflow**: fetch NAV, median DON consensus, write to DataFeedsCache on 2 chains — [`CRE_PoR_Bool/nav/main.ts`](CRE_PoR_Bool/nav/main.ts) (241 lines)
+- **AI Agent MCP Server**: 15 tools for bank operations + on-chain admin (Claude as operator) — [`ACE/backend/mcp-server.js`](ACE/backend/mcp-server.js) (1,174 lines)
+- **On-chain interaction layer** (viem): register identity, freeze, sanction, mint — [`ACE/backend/chain.js`](ACE/backend/chain.js) (486 lines)
+- **Backend HTTP API**: KYC, orders, receipts, transparency, batch endpoint for CRE — [`ACE/backend/http-server.js`](ACE/backend/http-server.js) (501 lines)
+- **CRE receiver contract** implementing `IReceiver.onReport()` — [`CRE_PoR_Bool/contracts/abi/CRE_Oracle_minter.sol`](CRE_PoR_Bool/contracts/abi/CRE_Oracle_minter.sol) (175 lines)
+
+### Track 3: Risk & Compliance
+
+Full Bolivian regulatory compliance engine enforced on-chain — sanctions, KYC tiers, anti-smurfing, UIF reporting, freezes, and timelocked upgrades.
+
+- **PolicyManager**: KYC-tiered daily limits, sanctions, anti-smurfing (5tx/hr cooldown), auto UIF reports — [`ACE/src/PolicyManager.sol`](ACE/src/PolicyManager.sol) (197 lines)
+- **CCIDRegistry**: Cross-chain identity with KYC tiers (1/2/3), annual expiration, credential uniqueness — [`ACE/src/CCIDRegistry.sol`](ACE/src/CCIDRegistry.sol) (95 lines)
+- **ACE-compatible interfaces** (IPolicyManager, ICCIDRegistry, IFiatDepositOracle) — [`ACE/src/interfaces/IACEInterfaces.sol`](ACE/src/interfaces/IACEInterfaces.sol) (117 lines)
+- **48-hour timelocked** compliance engine upgrades (migration to real ACE) — [`ACE/src/StablecoinBOB.sol`](ACE/src/StablecoinBOB.sol) L82-L100
+- **AI-powered UIF reports** + sanctions management via MCP — [`ACE/backend/mcp-server.js`](ACE/backend/mcp-server.js) (tools: `generate_uif_report`, `add_to_sanctions`, `freeze_wallet`)
+- **55 contract tests** covering all compliance rules — [`ACE/test/`](ACE/test/) (765 lines)
+
+---
+
+## CRE Workflows
+
+CRE serves as BOBs' **oracle execution and automation layer** — it reliably fetches off-chain reserve and approval state, packages it as an authenticated report, and delivers it on-chain. CRE does **not** decide who gets minted or how much; the on-chain receiver contract performs all enforcement deterministically. This separation is intentional: **CRE provides trustworthy delivery; the contract provides deterministic enforcement.**
+
+### PoR Workflow (Batch Minting with Dual Controls)
+
+The core CRE integration: fetches approved orders + bank balance from the backend API, writes a signed report to the [`CRE_BOBC`](CRE_PoR_Bool/contracts/abi/CRE_Oracle_minter.sol) receiver contract on Sepolia (`0x87ba13aF77c9c37aBa42232B4C625C066a433eeE`). The contract enforces `delta == sum` before batch minting.
+
+```mermaid
+sequenceDiagram
+    participant API as Backend API<br/>GET /batch
+    participant CRE as CRE Workflow<br/>por/main.ts
+    participant Contract as CRE_BOBC<br/>onReport()
+
+    API->>CRE: { bankBalance: 150, approvedIds: [1, 2] }
+    Note over CRE: 1. Validate types & schema
+    Note over CRE: 2. Scale to 18 decimals
+    Note over CRE: 3. abi.encode(balance, ids)
+    CRE->>Contract: writeReport(bankBalanceScaled, approvedIds)
+    Note over Contract: delta = new - lastProcessed
+    Note over Contract: sum = S(order.amount)
+    Note over Contract: REQUIRE delta == sum
+    Contract->>Contract: Batch mint all approved orders
+    Note over Contract: Advance lastProcessedBankBalance
+```
+
+**Key files:** [`CRE_PoR_Bool/por/main.ts`](CRE_PoR_Bool/por/main.ts) | [`CRE_PoR_Bool/contracts/abi/CRE_Oracle_minter.sol`](CRE_PoR_Bool/contracts/abi/CRE_Oracle_minter.sol) | [`CRE_PoR_Bool/por/config.json`](CRE_PoR_Bool/por/config.json)
+
+### NAV Workflow (Reserve Oracle)
+
+A CRE workflow that fetches Net Asset Value from an external API, applies **median consensus across DON nodes**, and writes to Chainlink `DataFeedsCache` on Sepolia and Base Sepolia.
+
+**Key files:** [`CRE_PoR_Bool/nav/main.ts`](CRE_PoR_Bool/nav/main.ts) | [`CRE_PoR_Bool/nav/config.json`](CRE_PoR_Bool/nav/config.json)
+
+> Full CRE documentation: [`CRE_PoR_Bool/README.md`](CRE_PoR_Bool/README.md) — What CRE does, what it reads, what it writes, and how the on-chain contract enforces correctness
+
+---
+
+## Smart Contracts (ACE)
+
+Six Solidity contracts implementing the BOBs stablecoin with full compliance lifecycle. Built with Foundry, deployed on Ethereum Sepolia and Base Sepolia.
+
+| Contract             | File                                    | Role                                              |
+|----------------------|-----------------------------------------|---------------------------------------------------|
+| **StablecoinBOB**    | [`StablecoinBOB.sol`][sol-token]        | ERC-20 with `_update()` compliance hook           |
+| **PolicyManager**    | [`PolicyManager.sol`][sol-policy]       | ACE mock: KYC limits, sanctions, anti-smurfing    |
+| **CCIDRegistry**     | [`CCIDRegistry.sol`][sol-ccid]          | Cross-chain identity with tiers + expiration      |
+| **MinterContract**   | [`MinterContract.sol`][sol-minter]      | Mints BOBs after fiat deposit confirmed by oracle |
+| **RedeemContract**   | [`RedeemContract.sol`][sol-redeem]      | Burns BOBs + requests bank transfer               |
+| **FiatDepositOracle**| [`FiatDepositOracle.sol`][sol-oracle]   | CRE oracle: confirms deposits, tracks reserves    |
+| **CRE_BOBC**        | [`CRE_Oracle_minter.sol`][sol-cre]      | CRE receiver: batch PoR + approval minting        |
+| **MintableToken**    | [`token.sol`][sol-mintable]             | Minimal ERC-20 for CRE workflow                   |
+
+[sol-token]: ACE/src/StablecoinBOB.sol
+[sol-policy]: ACE/src/PolicyManager.sol
+[sol-ccid]: ACE/src/CCIDRegistry.sol
+[sol-minter]: ACE/src/MinterContract.sol
+[sol-redeem]: ACE/src/RedeemContract.sol
+[sol-oracle]: ACE/src/FiatDepositOracle.sol
+[sol-cre]: CRE_PoR_Bool/contracts/abi/CRE_Oracle_minter.sol
+[sol-mintable]: CRE_PoR_Bool/contracts/abi/token.sol
+
+### Compliance Rules (Bolivian Regulation)
+
+| Rule                    | Parameter      | Enforcement                                   |
+|-------------------------|----------------|-----------------------------------------------|
+| KYC Tier 1 (Individual) | Bs 5,000/day   | `PolicyManager._getDailyLimit()`              |
+| KYC Tier 2 (Enhanced)   | Bs 34,000/day  | `PolicyManager._getDailyLimit()`              |
+| KYC Tier 3 (Corporate)  | Bs 500,000/day | `PolicyManager._getDailyLimit()`              |
+| UIF Threshold           | >= Bs 34,500   | Auto `UIFReport` event in `recordTransfer()`  |
+| Anti-Smurfing           | 5 tx/hour      | 2-hour cooldown via `txCountByHour`           |
+| Sanctions               | OFAC + UIF     | Block all operations for sanctioned wallets   |
+| Identity Expiration     | 365 days       | Annual renewal required in `CCIDRegistry`     |
+| Timelock                | 48 hours       | All critical contract upgrades                |
+
+> Full ACE documentation: [`ACE/README.md`](ACE/README.md)
+
+---
+
+## AI Agent (MCP)
+
+An AI agent (Claude) operates as the day-to-day bank administrator via **Model Context Protocol (MCP)**. The agent loop polls every 30 seconds, processing pending KYC requests and orders autonomously. Receipt validation uses **Gemini Vision** for image analysis. The MCP server exposes 15 tools — 8 for off-chain bank operations and 7 for on-chain contract administration.
+
+### Bank Operations (off-chain)
+
+| Tool                         | Purpose                                    |
+|------------------------------|--------------------------------------------|
+| `confirm_deposit`            | Confirm fiat deposits, trigger mint flow   |
+| `get_reserves_balance`       | Query custodial bank balance for PoR       |
+| `execute_bank_transfer`      | Execute outgoing transfers for redemptions |
+| `get_transaction_status`     | Query deposit/transfer status              |
+| `verify_account_ownership`   | Verify bank account belongs to user        |
+| `link_wallet_to_account`     | Link wallet to bank account                |
+| `generate_uif_report`        | File SAR with Bolivia's UIF                |
+| `get_account_history`        | Audit transaction history                  |
+
+### Contract Admin (on-chain)
+
+| Tool                                   | Purpose                                       |
+|----------------------------------------|-----------------------------------------------|
+| `register_identity`                    | Register KYC identity on CCIDRegistry         |
+| `revoke_identity`                      | Revoke identity (fraud, expiry, court order)  |
+| `freeze_wallet` / `unfreeze_wallet`    | Freeze/unfreeze wallets on PolicyManager      |
+| `add_to_sanctions`                     | Add to sanctions list (irreversible by agent) |
+| `cre_create_order`                     | Create on-chain order on CRE_BOBC for minting |
+| `link_bank_account`                    | Link wallet to bank account on RedeemContract |
+| `emergency_mint`                       | Fallback mint when CRE is unavailable         |
+
+**Key files:** [`ACE/backend/mcp-server.js`](ACE/backend/mcp-server.js) | [`ACE/backend/chain.js`](ACE/backend/chain.js) | [`ACE/backend/db.js`](ACE/backend/db.js)
+
+> Full MCP specification: [`ACE/docs/BANK_MCP_SPEC.md`](ACE/docs/BANK_MCP_SPEC.md)
+
+---
+
+## Frontend
+
+React SPA for user-facing operations: KYC submission, token purchase, dashboard, and transparency page.
+
+- **Stack**: React 18 + Vite + Tailwind CSS v4 + Wagmi v3 + Shadcn/Radix UI
+- **Web3**: Wallet connection via MetaMask (injected connector)
+- **API**: All backend calls via [`frontend/src/app/config/api.ts`](frontend/src/app/config/api.ts)
+- **Pages**: Landing, Buy (KYC + order flow), Dashboard (balances + history), Transparency (reserves + agent activity)
+
+---
+
+## Deployed Contracts
+
+### Ethereum Sepolia (Chain ID: 11155111)
+
+| Contract                            | Address                                      | Verified |
+|-------------------------------------|----------------------------------------------|----------|
+| CCIDRegistry                        | `0x9968c2c127d3d88de61c87050ae3ef398eaf9719` | Yes      |
+| PolicyManager                       | `0x1c57a01b0e1f95848b22f31e8f90e9b07728dfe9` | Yes      |
+| CRE_BOBC (BatchPoRApprovalMinter)   | `0x87ba13aF77c9c37aBa42232B4C625C066a433eeE` | —        |
+| StablecoinBOBC                      | `0xf132Ba93754206DF89E61B43A9800498B7062C13` | Yes      |
+
+### Base Sepolia (Chain ID: 84532)
+
+| Contract      | Address                                      |
+|---------------|----------------------------------------------|
+| CCIDRegistry  | `0x9968c2c127d3d88de61c87050ae3ef398eaf9719` |
+| PolicyManager | `0x1c57a01b0e1f95848b22f31e8f90e9b07728dfe9` |
+
+### DataFeedsCache (NAV Workflow)
+
+| Chain        | Address                                      |
+|--------------|----------------------------------------------|
+| Sepolia      | `0x2A981E4B03dCaB97378e5B02886bC394Be959F66` |
+| Base Sepolia | `0xd918373C6852978B6269CE19F970eaAa2c7291E6` |
+
+---
+
+## Lines of Code
+
+| Module                         | Language       | Files  | Lines      |
+|--------------------------------|----------------|--------|------------|
+| Smart Contracts (source)       | Solidity       | 9      | 1,117      |
+| Smart Contract Tests           | Solidity       | 7      | 765        |
+| CRE Workflows                  | TypeScript     | 2      | 388        |
+| Backend (MCP + HTTP + Chain)   | JavaScript     | 5      | 2,565      |
+| Frontend                       | TypeScript/TSX | 62     | 7,013      |
+| **Total**                      |                | **85** | **11,848** |
+
+---
+
+## Getting Started
+
+### Prerequisites
+
+- [Foundry](https://book.getfoundry.sh/getting-started/installation) for smart contracts
+- [CRE CLI](https://docs.chain.link/cre) for CRE workflows
+- [Node.js](https://nodejs.org/) 18+ for backend
+- [pnpm](https://pnpm.io/) for frontend
+
+### Smart Contracts
+
+```bash
+cd ACE
+forge install
+forge build
+forge test -vvv          # 55 tests, 0 failures
+```
+
+### CRE Workflows
+
+```bash
+# PoR workflow (batch minting)
+cd CRE_PoR_Bool/por
+cre workflow simulate --target staging-settings
+
+# NAV workflow (reserve oracle)
+cd CRE_PoR_Bool/nav
+cre workflow simulate --target staging-settings
+
+# Broadcast to testnet
+cre workflow simulate --target staging-settings --broadcast
+```
+
+### Backend
+
+```bash
+cd ACE/backend
+npm install
+npm run dev              # starts MCP + HTTP servers
+```
+
+### Frontend
+
+```bash
+cd frontend
+pnpm install
+pnpm run dev             # starts Vite dev server
+```
+
+---
+
+## Tests
+
+```
+55 tests, 0 failures
+```
+
+| Suite                  | Coverage                                                           |
+|------------------------|--------------------------------------------------------------------|
+| `CCIDRegistry.t.sol`   | Registration, revocation, expiration, credential uniqueness, tiers |
+| `PolicyManager.t.sol`  | KYC1/2/3 limits, sanctions, freeze, cooldown, anti-smurfing, UIF  |
+| `StablecoinBOB.t.sol`  | Mint, burn, transfer with compliance hooks, timelock, pause        |
+| `MinterContract.t.sol` | Valid mint, double-mint, expired deposit, insufficient reserves    |
+| `RedeemContract.t.sol` | Valid redeem, minimum, no bank account, UIF report, force redeem   |
+| `Integration.t.sol`    | Full mint-transfer-redeem flow, multi-tier, edge cases             |
+
+---
+
+## Documentation
+
+| Document                                 | Description                                                                      |
+|------------------------------------------|----------------------------------------------------------------------------------|
+| [`ACE/README.md`][doc-ace]               | Smart contracts architecture and compliance rules                                |
+| [`CRE_PoR_Bool/README.md`][doc-cre]     | Chainlink CRE in BOBC: what it reads, writes, and how on-chain enforcement works |
+| [`CRE_SPEC.md`][doc-cre-spec]           | CRE Oracle specification (3 jobs)                                                |
+| [`BANK_MCP_SPEC.md`][doc-mcp]           | AI Agent MCP specification (15 tools)                                            |
+| [`ACE_INTEGRATION.md`][doc-ace-int]      | Chainlink ACE integration and migration guide                                    |
+| [`CRE_INTEGRATION.md`][doc-cre-int]     | CRE PoR deployment and integration guide                                         |
+| [`VALIDATION_REPORT.md`][doc-val]        | Validation report: 26 PASS, 4 PARTIAL, 1 FAIL                                   |
+
+[doc-ace]: ACE/README.md
+[doc-cre]: CRE_PoR_Bool/README.md
+[doc-cre-spec]: ACE/docs/CRE_SPEC.md
+[doc-mcp]: ACE/docs/BANK_MCP_SPEC.md
+[doc-ace-int]: ACE/docs/ACE_INTEGRATION_GUIDE.md
+[doc-cre-int]: ACE/docs/CRE_INTEGRATION.md
+[doc-val]: ACE/docs/VALIDATION_REPORT.md
+
+---
+
+## Repository Structure
+
+```
+bobc/
++-- ACE/                              # Smart contracts + backend
+|   +-- src/                          # 7 Solidity contracts (923 lines)
+|   |   +-- StablecoinBOB.sol         #   ERC-20 with compliance hooks
+|   |   +-- PolicyManager.sol         #   ACE mock: limits, sanctions, anti-smurfing
+|   |   +-- CCIDRegistry.sol          #   Cross-chain identity registry
+|   |   +-- MinterContract.sol        #   Fiat-to-token minting
+|   |   +-- RedeemContract.sol        #   Token-to-fiat redemption
+|   |   +-- FiatDepositOracle.sol     #   CRE oracle for deposit confirmation
+|   |   +-- interfaces/               #   ACE-compatible interfaces
+|   +-- test/                         # 7 test files, 55 tests (765 lines)
+|   +-- script/                       # Foundry deployment scripts
+|   +-- backend/                      # Node.js backend (2,565 lines)
+|   |   +-- mcp-server.js            #   MCP server with 15 tools
+|   |   +-- http-server.js           #   REST API (KYC, orders, batch)
+|   |   +-- chain.js                 #   On-chain interaction (viem)
+|   |   +-- db.js                    #   SQLite database layer
+|   +-- docs/                         # Specifications and guides
++-- CRE_PoR_Bool/                     # Chainlink CRE workflows (388 lines)
+|   +-- por/                          #   PoR batch minting workflow
+|   |   +-- main.ts                  #   Fetch, validate, writeReport
+|   |   +-- config.json              #   Schedule, URL, receiver
+|   +-- nav/                          #   NAV oracle workflow
+|   |   +-- main.ts                  #   Fetch NAV, median consensus, write
+|   |   +-- config.json              #   Schedule, URL, DataFeedsCache
+|   +-- contracts/abi/                #   On-chain receiver + token
++-- frontend/                         # React SPA (7,013 lines)
+|   +-- src/app/components/           #   Page components + UI library
+|   +-- src/app/config/               #   Wagmi + API client
++-- CLAUDE.md                         # Development instructions
+```
+
+---
+
+<div align="center">
+
+**Built for Convergence: A Chainlink Hackathon 2026**
+
+*Bringing Bolivia on-chain, compliantly.*
+
+</div>
