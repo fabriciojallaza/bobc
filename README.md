@@ -14,7 +14,7 @@ Bolivia has been on the **FATF grey list since 2020** — Bolivians cannot acces
 
 - [System Architecture](#system-architecture)
 - [Hackathon Track Mapping](#hackathon-track-mapping)
-- [CRE Workflows](#cre-workflows)
+- [CRE Workflow](#cre-workflow)
 - [Smart Contracts (ACE)](#smart-contracts-ace)
 - [AI Agent (MCP)](#ai-agent-mcp)
 - [Frontend](#frontend)
@@ -40,7 +40,6 @@ flowchart TB
 
     subgraph CRE["Chainlink CRE"]
         POR["PoR Workflow\npor/main.ts\nFetch → Validate → Scale → writeReport"]
-        NAV["NAV Workflow\nnav/main.ts\nFetch NAV → Median DON Consensus → writeReport"]
     end
 
     subgraph CHAIN["Blockchain (Sepolia / Base)"]
@@ -48,7 +47,6 @@ flowchart TB
         TOKEN["StablecoinBOBC (ERC-20)\n_update() → compliance hook"]
         POLICY["PolicyManager (ACE mock)\nKYC limits · Sanctions\nAnti-smurfing · UIF events"]
         CCID["CCIDRegistry\nKYC tiers · Expiration\nCredential uniqueness"]
-        DFC["DataFeedsCache\n(Chainlink)\nSepolia + Base Sepolia"]
     end
 
     USER -- "1. Pay fiat" --> API
@@ -60,7 +58,6 @@ flowchart TB
     TOKEN -- "Every transfer" --> POLICY
     POLICY -- "Check KYC" --> CCID
     POLICY -- "UIFReport event\n≥ Bs 34,500" --> UIF
-    NAV -- "6. NAV feed" --> DFC
 ```
 
 ---
@@ -74,17 +71,15 @@ BOBs is a **stablecoin issuance mechanism** with **Proof of Reserve data feeds**
 - **ERC-20 stablecoin** with compliance hooks on every `_update()` — [`ACE/src/StablecoinBOB.sol`](ACE/src/StablecoinBOB.sol) (129 lines)
 - **Batch minting** gated by PoR balance delta verification — [`CRE_PoR_Bool/contracts/abi/CRE_Oracle_minter.sol`](CRE_PoR_Bool/contracts/abi/CRE_Oracle_minter.sol) (175 lines)
 - **CRE PoR workflow** publishing reserve reports on-chain — [`CRE_PoR_Bool/por/main.ts`](CRE_PoR_Bool/por/main.ts) (147 lines)
-- **CRE NAV workflow** writing to Chainlink DataFeedsCache — [`CRE_PoR_Bool/nav/main.ts`](CRE_PoR_Bool/nav/main.ts) (241 lines)
 - **Fiat deposit oracle** tracking reserves and staleness — [`ACE/src/FiatDepositOracle.sol`](ACE/src/FiatDepositOracle.sol) (84 lines)
 - **Mint flow**: oracle confirmation, reserve check, CCID validation — [`ACE/src/MinterContract.sol`](ACE/src/MinterContract.sol) (135 lines)
 - **Redeem flow**: burn + bank transfer + UIF reporting — [`ACE/src/RedeemContract.sol`](ACE/src/RedeemContract.sol) (166 lines)
 
 ### Track 2: CRE & AI
 
-Two production CRE workflows + an AI agent operating bank processes via MCP.
+A production CRE workflow + an AI agent operating bank processes via MCP.
 
 - **CRE PoR Workflow**: fetch batch API, validate, scale to 18 decimals, `writeReport` — [`CRE_PoR_Bool/por/main.ts`](CRE_PoR_Bool/por/main.ts) (147 lines)
-- **CRE NAV Workflow**: fetch NAV, median DON consensus, write to DataFeedsCache on 2 chains — [`CRE_PoR_Bool/nav/main.ts`](CRE_PoR_Bool/nav/main.ts) (241 lines)
 - **AI Agent MCP Server**: 15 tools for bank operations + on-chain admin (Claude as operator) — [`ACE/backend/mcp-server.js`](ACE/backend/mcp-server.js) (1,174 lines)
 - **On-chain interaction layer** (viem): register identity, freeze, sanction, mint — [`ACE/backend/chain.js`](ACE/backend/chain.js) (486 lines)
 - **Backend HTTP API**: KYC, orders, receipts, transparency, batch endpoint for CRE — [`ACE/backend/http-server.js`](ACE/backend/http-server.js) (501 lines)
@@ -103,7 +98,7 @@ Full Bolivian regulatory compliance engine enforced on-chain — sanctions, KYC 
 
 ---
 
-## CRE Workflows
+## CRE Workflow
 
 CRE serves as BOBs' **oracle execution and automation layer** — it reliably fetches off-chain reserve and approval state, packages it as an authenticated report, and delivers it on-chain. CRE does **not** decide who gets minted or how much; the on-chain receiver contract performs all enforcement deterministically. This separation is intentional: **CRE provides trustworthy delivery; the contract provides deterministic enforcement.**
 
@@ -130,12 +125,6 @@ sequenceDiagram
 ```
 
 **Key files:** [`CRE_PoR_Bool/por/main.ts`](CRE_PoR_Bool/por/main.ts) | [`CRE_PoR_Bool/contracts/abi/CRE_Oracle_minter.sol`](CRE_PoR_Bool/contracts/abi/CRE_Oracle_minter.sol) | [`CRE_PoR_Bool/por/config.json`](CRE_PoR_Bool/por/config.json)
-
-### NAV Workflow (Reserve Oracle)
-
-A CRE workflow that fetches Net Asset Value from an external API, applies **median consensus across DON nodes**, and writes to Chainlink `DataFeedsCache` on Sepolia and Base Sepolia.
-
-**Key files:** [`CRE_PoR_Bool/nav/main.ts`](CRE_PoR_Bool/nav/main.ts) | [`CRE_PoR_Bool/nav/config.json`](CRE_PoR_Bool/nav/config.json)
 
 > Full CRE documentation: [`CRE_PoR_Bool/README.md`](CRE_PoR_Bool/README.md) — What CRE does, what it reads, what it writes, and how the on-chain contract enforces correctness
 
@@ -246,13 +235,6 @@ React SPA for user-facing operations: KYC submission, token purchase, dashboard,
 | CCIDRegistry  | `0x9968c2c127d3d88de61c87050ae3ef398eaf9719` |
 | PolicyManager | `0x1c57a01b0e1f95848b22f31e8f90e9b07728dfe9` |
 
-### DataFeedsCache (NAV Workflow)
-
-| Chain        | Address                                      |
-|--------------|----------------------------------------------|
-| Sepolia      | `0x2A981E4B03dCaB97378e5B02886bC394Be959F66` |
-| Base Sepolia | `0xd918373C6852978B6269CE19F970eaAa2c7291E6` |
-
 ---
 
 ## Lines of Code
@@ -261,10 +243,10 @@ React SPA for user-facing operations: KYC submission, token purchase, dashboard,
 |--------------------------------|----------------|--------|------------|
 | Smart Contracts (source)       | Solidity       | 9      | 1,117      |
 | Smart Contract Tests           | Solidity       | 7      | 765        |
-| CRE Workflows                  | TypeScript     | 2      | 388        |
+| CRE Workflow                   | TypeScript     | 1      | 147        |
 | Backend (MCP + HTTP + Chain)   | JavaScript     | 5      | 2,565      |
 | Frontend                       | TypeScript/TSX | 62     | 7,013      |
-| **Total**                      |                | **85** | **11,848** |
+| **Total**                      |                | **84** | **11,607** |
 
 ---
 
@@ -286,15 +268,10 @@ forge build
 forge test -vvv          # 55 tests, 0 failures
 ```
 
-### CRE Workflows
+### CRE Workflow
 
 ```bash
-# PoR workflow (batch minting)
 cd CRE_PoR_Bool/por
-cre workflow simulate --target staging-settings
-
-# NAV workflow (reserve oracle)
-cd CRE_PoR_Bool/nav
 cre workflow simulate --target staging-settings
 
 # Broadcast to testnet
@@ -379,13 +356,10 @@ bobc/
 |   |   +-- chain.js                 #   On-chain interaction (viem)
 |   |   +-- db.js                    #   SQLite database layer
 |   +-- docs/                         # Specifications and guides
-+-- CRE_PoR_Bool/                     # Chainlink CRE workflows (388 lines)
++-- CRE_PoR_Bool/                     # Chainlink CRE workflow
 |   +-- por/                          #   PoR batch minting workflow
 |   |   +-- main.ts                  #   Fetch, validate, writeReport
 |   |   +-- config.json              #   Schedule, URL, receiver
-|   +-- nav/                          #   NAV oracle workflow
-|   |   +-- main.ts                  #   Fetch NAV, median consensus, write
-|   |   +-- config.json              #   Schedule, URL, DataFeedsCache
 |   +-- contracts/abi/                #   On-chain receiver + token
 +-- frontend/                         # React SPA (7,013 lines)
 |   +-- src/app/components/           #   Page components + UI library
@@ -395,10 +369,4 @@ bobc/
 
 ---
 
-<div align="center">
-
-**Built for Convergence: A Chainlink Hackathon 2026**
-
-*Bringing Bolivia on-chain, compliantly.*
-
-</div>
+**Built for Convergence: A Chainlink Hackathon 2026** — *Bringing Bolivia on-chain, compliantly.*
