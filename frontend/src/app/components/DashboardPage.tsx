@@ -1,79 +1,68 @@
-import { Wallet, TrendingUp, ArrowDownToLine, CheckCircle2, Clock, XCircle, Receipt } from 'lucide-react';
-import { useAccount } from 'wagmi';
+import { Wallet, TrendingUp, ArrowDownToLine, CheckCircle2, Clock, XCircle, Loader2, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { useAccount, useReadContract } from 'wagmi';
 import { useEffect, useState } from 'react';
+import { formatUnits } from 'viem';
+import { api } from '../config/api';
+import { BOBC_TOKEN_ADDRESS, BOBC_TOKEN_ABI } from '../config/contracts';
 
-const defaultTransactions = [
-  {
-    id: 'TX-001',
-    type: 'Mint',
-    amount: 1000,
-    status: 'completed',
-    date: '2026-02-25',
-    time: '14:32',
-    isNew: false,
-  },
-  {
-    id: 'TX-002',
-    type: 'Mint',
-    amount: 5000,
-    status: 'completed',
-    date: '2026-02-23',
-    time: '10:15',
-    isNew: false,
-  },
-  {
-    id: 'TX-003',
-    type: 'Redeem',
-    amount: 2500,
-    status: 'pending',
-    date: '2026-02-22',
-    time: '16:45',
-    isNew: false,
-  },
-  {
-    id: 'TX-004',
-    type: 'Mint',
-    amount: 3500,
-    status: 'completed',
-    date: '2026-02-20',
-    time: '09:20',
-    isNew: false,
-  },
-  {
-    id: 'TX-005',
-    type: 'Mint',
-    amount: 500,
-    status: 'failed',
-    date: '2026-02-18',
-    time: '11:30',
-    isNew: false,
-  },
-];
+interface WalletProfile {
+  isValid: boolean;
+  tier: number;
+  tierName: string;
+  frozen: boolean;
+  sanctioned: boolean;
+}
+
+const TIER_LIMITS: Record<number, string> = {
+  0: '—',
+  1: 'Bs 10,000 / tx',
+  2: 'Bs 50,000 / tx',
+  3: 'Sin límite',
+};
 
 export function DashboardPage() {
   const { address, isConnected } = useAccount();
-  const [transactions, setTransactions] = useState<any[]>(defaultTransactions);
-  const [showReceipt, setShowReceipt] = useState(false);
-  const totalBalance = 7000;
-  const bsEquivalent = 7000;
+  const [orders, setOrders] = useState<any[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [kycStatus, setKycStatus] = useState<string | null>(null);
+  const [profile, setProfile] = useState<WalletProfile | null>(null);
+
+  // Read BOBC balance from chain
+  const { data: balanceData, isLoading: balanceLoading } = useReadContract({
+    address: BOBC_TOKEN_ADDRESS,
+    abi: BOBC_TOKEN_ABI,
+    functionName: 'balanceOf',
+    args: address ? [address] : undefined,
+    query: { enabled: !!address },
+  });
+
+  const { data: decimalsData } = useReadContract({
+    address: BOBC_TOKEN_ADDRESS,
+    abi: BOBC_TOKEN_ABI,
+    functionName: 'decimals',
+  });
+
+  const decimals = decimalsData ?? 18;
+  const balance = balanceData ? Number(formatUnits(balanceData as bigint, decimals as number)) : 0;
 
   useEffect(() => {
-    // Load transactions from localStorage
-    const storedTxs = localStorage.getItem('bobcTransactions');
-    if (storedTxs) {
-      const parsedTxs = JSON.parse(storedTxs);
-      setTransactions([...parsedTxs, ...defaultTransactions]);
-      
-      // Check if there's a new transaction
-      const hasNewTransaction = parsedTxs.some((tx: any) => tx.isNew);
-      if (hasNewTransaction) {
-        setShowReceipt(true);
-        // Clear the isNew flag after showing
-        const updatedTxs = parsedTxs.map((tx: any) => ({ ...tx, isNew: false }));
-        localStorage.setItem('bobcTransactions', JSON.stringify(updatedTxs));
-      }
-    }
-  }, []);
+    if (!address) return;
+    setOrdersLoading(true);
+    api.getOrders(address)
+      .then((data) => { if (data.orders) setOrders(data.orders); })
+      .catch(() => {})
+      .finally(() => setOrdersLoading(false));
+  }, [address]);
+
+  useEffect(() => {
+    if (!address) return;
+    api.getKycStatus(address)
+      .then((data) => { if (!data.error) setKycStatus(data.status); })
+      .catch(() => {});
+    api.getProfile(address)
+      .then((data: WalletProfile) => setProfile(data))
+      .catch(() => {});
+  }, [address]);
 
   if (!isConnected) {
     return (
@@ -88,9 +77,6 @@ export function DashboardPage() {
               <p className="text-muted-foreground mb-6">
                 Please connect your wallet to view your dashboard and manage your BOBC holdings.
               </p>
-              <button className="px-6 py-3 bg-accent text-white rounded-lg hover:bg-accent/90 transition-colors shadow-lg shadow-accent/20">
-                Connect Wallet
-              </button>
             </div>
           </div>
         </div>
@@ -105,63 +91,26 @@ export function DashboardPage() {
           <h1 className="text-4xl md:text-5xl font-semibold text-primary mb-2">Dashboard</h1>
           <p className="text-lg text-muted-foreground">Manage your BOBC holdings</p>
           {address && (
-            <div className="mt-4 inline-flex items-center gap-2 px-4 py-2 bg-primary/5 rounded-lg border border-primary/20">
-              <Wallet className="w-4 h-4 text-primary" />
-              <span className="font-mono text-sm text-primary">{address.slice(0, 10)}...{address.slice(-8)}</span>
+            <div className="mt-4 flex items-center gap-3 flex-wrap">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/5 rounded-lg border border-primary/20">
+                <Wallet className="w-4 h-4 text-primary" />
+                <span className="font-mono text-sm text-primary">{address.slice(0, 10)}...{address.slice(-8)}</span>
+              </div>
+              {kycStatus && (
+                <div className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full border text-sm font-medium ${
+                  kycStatus === 'approved'
+                    ? 'bg-accent/10 text-accent border-accent/20'
+                    : kycStatus === 'pending'
+                    ? 'bg-yellow-50 text-yellow-600 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-400 dark:border-yellow-800'
+                    : 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800'
+                }`}>
+                  {kycStatus === 'approved' ? <CheckCircle2 className="w-3.5 h-3.5" /> : <Clock className="w-3.5 h-3.5" />}
+                  KYC: {kycStatus}
+                </div>
+              )}
             </div>
           )}
         </div>
-
-        {/* Receipt Banner - Show if there's a new transaction */}
-        {showReceipt && transactions.length > 0 && (
-          <div className="mb-8 bg-gradient-to-br from-accent/10 via-accent/5 to-transparent rounded-2xl border border-accent/20 p-8 shadow-lg">
-            <div className="flex items-start gap-6">
-              <div className="w-16 h-16 bg-accent rounded-xl flex items-center justify-center flex-shrink-0">
-                <Receipt className="w-8 h-8 text-white" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-start justify-between mb-4">
-                  <div>
-                    <h3 className="text-2xl font-semibold text-primary mb-1">Transaction Successful!</h3>
-                    <p className="text-muted-foreground">Your BOBC has been minted and added to your wallet</p>
-                  </div>
-                  <button
-                    onClick={() => setShowReceipt(false)}
-                    className="text-muted-foreground hover:text-foreground transition-colors"
-                  >
-                    ×
-                  </button>
-                </div>
-                
-                <div className="bg-card rounded-xl p-6 space-y-4">
-                  <div className="flex justify-between items-center pb-4 border-b border-border">
-                    <span className="text-sm text-muted-foreground">Transaction ID</span>
-                    <span className="font-mono text-sm font-semibold text-foreground">{transactions[0].id}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Amount Minted</span>
-                    <span className="text-2xl font-semibold text-accent">+{transactions[0].amount.toLocaleString()} BOBC</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Equivalent</span>
-                    <span className="font-semibold text-foreground">Bs {transactions[0].amount.toLocaleString()}</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-muted-foreground">Date & Time</span>
-                    <span className="text-sm text-foreground">{transactions[0].date} at {transactions[0].time}</span>
-                  </div>
-                  <div className="flex justify-between items-center pt-4 border-t border-border">
-                    <span className="text-sm text-muted-foreground">Status</span>
-                    <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full border text-sm font-medium bg-accent/10 text-accent border-accent/20">
-                      <CheckCircle2 className="w-3.5 h-3.5" />
-                      Completed
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Balance Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-12">
@@ -169,14 +118,20 @@ export function DashboardPage() {
             <div className="flex items-start justify-between mb-6">
               <div>
                 <div className="text-sm text-white/70 mb-2">Total Balance</div>
-                <div className="text-5xl font-semibold mb-2">{totalBalance.toLocaleString()} BOBC</div>
-                <div className="text-white/80">≈ Bs {bsEquivalent.toLocaleString()}</div>
+                {balanceLoading ? (
+                  <Loader2 className="w-8 h-8 animate-spin text-white/70" />
+                ) : (
+                  <>
+                    <div className="text-5xl font-semibold mb-2">{balance.toLocaleString()} BOBC</div>
+                    <div className="text-white/80">= Bs {balance.toLocaleString()}</div>
+                  </>
+                )}
               </div>
               <div className="w-14 h-14 bg-white/10 backdrop-blur-sm rounded-xl flex items-center justify-center">
                 <Wallet className="w-7 h-7" />
               </div>
             </div>
-            
+
             <div className="flex gap-3">
               <button className="flex-1 py-3 bg-white text-[#0B1C2D] rounded-xl hover:bg-white/90 transition-all font-medium">
                 Buy More
@@ -205,49 +160,101 @@ export function DashboardPage() {
           </div>
         </div>
 
-        {/* Transaction History */}
+        {/* ACE Profile */}
+        <div className="bg-card rounded-2xl border border-border/50 shadow-sm p-8 mb-8">
+          <div className="flex items-center gap-2 mb-6">
+            <ShieldCheck className="w-5 h-5 text-accent" />
+            <h2 className="text-xl font-semibold text-primary">Perfil ACE</h2>
+          </div>
+          {!profile ? (
+            <div className="flex items-center gap-2 text-muted-foreground text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" /> Consultando chain...
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-background rounded-xl p-4 border border-border/40">
+                <div className="text-xs text-muted-foreground mb-1">Estado KYC</div>
+                <div className={`font-semibold flex items-center gap-1.5 ${profile.isValid ? 'text-accent' : 'text-muted-foreground'}`}>
+                  {profile.isValid ? <CheckCircle2 className="w-4 h-4" /> : <Clock className="w-4 h-4" />}
+                  {profile.isValid ? 'Verificado' : 'No verificado'}
+                </div>
+              </div>
+              <div className="bg-background rounded-xl p-4 border border-border/40">
+                <div className="text-xs text-muted-foreground mb-1">Tier</div>
+                <div className="font-semibold text-primary">
+                  {profile.tier === 0 ? '—' : `🪪 ${profile.tierName}`}
+                </div>
+              </div>
+              <div className="bg-background rounded-xl p-4 border border-border/40">
+                <div className="text-xs text-muted-foreground mb-1">Límite por tx</div>
+                <div className="font-semibold text-primary">{TIER_LIMITS[profile.tier]}</div>
+              </div>
+              <div className="bg-background rounded-xl p-4 border border-border/40">
+                <div className="text-xs text-muted-foreground mb-1">Estado wallet</div>
+                <div className={`font-semibold flex items-center gap-1.5 ${profile.frozen || profile.sanctioned ? 'text-red-500' : 'text-accent'}`}>
+                  {profile.frozen || profile.sanctioned
+                    ? <><ShieldAlert className="w-4 h-4" />{profile.frozen ? 'Congelada' : 'Sancionada'}</>
+                    : <><CheckCircle2 className="w-4 h-4" />Activa</>}
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Order History */}
         <div className="bg-card rounded-2xl border border-border/50 shadow-sm overflow-hidden">
           <div className="p-8 border-b border-border/50">
-            <h2 className="text-2xl font-semibold text-primary">Transaction History</h2>
+            <h2 className="text-2xl font-semibold text-primary">Order History</h2>
           </div>
 
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-background">
-                <tr>
-                  <th className="px-8 py-4 text-left text-sm text-muted-foreground">Transaction ID</th>
-                  <th className="px-8 py-4 text-left text-sm text-muted-foreground">Type</th>
-                  <th className="px-8 py-4 text-left text-sm text-muted-foreground">Amount</th>
-                  <th className="px-8 py-4 text-left text-sm text-muted-foreground">Status</th>
-                  <th className="px-8 py-4 text-left text-sm text-muted-foreground">Date</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border/50">
-                {transactions.map((tx) => (
-                  <tr key={tx.id} className="hover:bg-background/50 transition-colors">
-                    <td className="px-8 py-5">
-                      <span className="font-mono text-sm text-foreground">{tx.id}</span>
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className="text-foreground">{tx.type}</span>
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className="font-semibold text-foreground">
-                        {tx.type === 'Redeem' ? '-' : '+'}{tx.amount.toLocaleString()} BOBC
-                      </span>
-                    </td>
-                    <td className="px-8 py-5">
-                      <StatusBadge status={tx.status} />
-                    </td>
-                    <td className="px-8 py-5">
-                      <div className="text-foreground">{tx.date}</div>
-                      <div className="text-sm text-muted-foreground">{tx.time}</div>
-                    </td>
+          {ordersLoading ? (
+            <div className="flex items-center justify-center py-12">
+              <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+            </div>
+          ) : orders.length === 0 ? (
+            <div className="text-center py-12 text-muted-foreground">
+              No orders yet. Buy some BOBC to get started.
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-background">
+                  <tr>
+                    <th className="px-8 py-4 text-left text-sm text-muted-foreground">Order ID</th>
+                    <th className="px-8 py-4 text-left text-sm text-muted-foreground">Reference</th>
+                    <th className="px-8 py-4 text-left text-sm text-muted-foreground">Amount</th>
+                    <th className="px-8 py-4 text-left text-sm text-muted-foreground">Status</th>
+                    <th className="px-8 py-4 text-left text-sm text-muted-foreground">Date</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-border/50">
+                  {orders.map((order: any) => (
+                    <tr key={order.id} className="hover:bg-background/50 transition-colors">
+                      <td className="px-8 py-5">
+                        <span className="font-mono text-sm text-foreground">#{order.id}</span>
+                      </td>
+                      <td className="px-8 py-5">
+                        <span className="font-mono text-sm text-foreground">{order.reference || '-'}</span>
+                      </td>
+                      <td className="px-8 py-5">
+                        <span className="font-semibold text-foreground">
+                          {Number(order.amount_bs).toLocaleString()} BOBC
+                        </span>
+                      </td>
+                      <td className="px-8 py-5">
+                        <StatusBadge status={order.status} />
+                      </td>
+                      <td className="px-8 py-5">
+                        <div className="text-foreground text-sm">
+                          {order.created_at ? new Date(order.created_at * 1000).toLocaleDateString() : '-'}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -255,8 +262,13 @@ export function DashboardPage() {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const config = {
-    completed: {
+  const configs: Record<string, { icon: any; label: string; className: string }> = {
+    confirmed: {
+      icon: CheckCircle2,
+      label: 'Confirmed',
+      className: 'bg-accent/10 text-accent border-accent/20',
+    },
+    minted: {
       icon: CheckCircle2,
       label: 'Minted',
       className: 'bg-accent/10 text-accent border-accent/20',
@@ -266,14 +278,24 @@ function StatusBadge({ status }: { status: string }) {
       label: 'Pending',
       className: 'bg-yellow-50 text-yellow-600 border-yellow-200 dark:bg-yellow-950 dark:text-yellow-400 dark:border-yellow-800',
     },
+    awaiting_validation: {
+      icon: Clock,
+      label: 'Awaiting Validation',
+      className: 'bg-blue-50 text-blue-600 border-blue-200 dark:bg-blue-950 dark:text-blue-400 dark:border-blue-800',
+    },
     failed: {
       icon: XCircle,
       label: 'Failed',
       className: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800',
     },
+    rejected: {
+      icon: XCircle,
+      label: 'Rejected',
+      className: 'bg-red-50 text-red-600 border-red-200 dark:bg-red-950 dark:text-red-400 dark:border-red-800',
+    },
   };
 
-  const badge = config[status as keyof typeof config] || config.pending;
+  const badge = configs[status] || configs.pending;
   const Icon = badge.icon;
 
   return (
