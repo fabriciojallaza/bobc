@@ -4,3 +4,6 @@
 CRE_PoR/por/node_modules/
 CRE_PoR/nav/node_modules/
 CRE_PoR/.env
+ACE/.env
+**/.env
+**/.env.local
