@@ -3,6 +3,8 @@
 > **Convergence: A Chainlink Hackathon | February - March 2026**
 >
 > Tracks: **DeFi & Tokenization** | **CRE & AI** | **Risk & Compliance**
+>
+> **Live Demo:** [app.condordev.xyz](https://app.condordev.xyz/)
 
 BOBC is a **production-ready stablecoin** pegged 1:1 to the Bolivian Peso (BOB) with full regulatory compliance enforced on-chain. It combines **Chainlink CRE** for fiat-blockchain bridging, **Chainlink ACE-compatible** smart contracts for compliance enforcement, and an **AI Agent (Claude MCP)** that operates bank-side processes autonomously.
 
@@ -38,32 +40,32 @@ BOBC is free to mint and redeem at a 1:1 rate. Revenue comes from deploying idle
 ```mermaid
 flowchart TB
     subgraph OFF["Off-Chain"]
-        USER["User\n(Bolivian Bank Account)"]
-        API["Backend API\nGET /batch\nbankBalance + approvedIds"]
-        MCP["AI Agent (Claude + Gemini Vision)\nMCP Server — 15 tools\n30s agent loop\nKYC, receipts, sanctions, UIF"]
-        UIF["Bolivia UIF\n(Regulator)"]
+        USER["User<br/>(Bolivian Bank Account)"]
+        API["Backend API<br/>GET /batch<br/>bankBalance + approvedIds"]
+        MCP["AI Agent (Claude + Gemini Vision)<br/>MCP Server — 15 tools<br/>30s agent loop<br/>KYC, receipts, sanctions, UIF"]
+        UIF["Bolivia UIF<br/>(Regulator)"]
     end
 
     subgraph CRE["Chainlink CRE"]
-        POR["PoR Workflow\npor/main.ts\nFetch → Validate → Scale → writeReport"]
+        POR["PoR Workflow<br/>por/main.ts<br/>Fetch → Validate → Scale → writeReport"]
     end
 
     subgraph CHAIN["Blockchain (Sepolia / Base)"]
-        BOBC["CRE_BOBC\nBatchPoRApprovalMinter\nonReport(): delta == sum → batch mint"]
-        TOKEN["StablecoinBOBC (ERC-20)\n_update() → compliance hook"]
-        POLICY["PolicyManager (ACE mock)\nKYC limits · Sanctions\nAnti-smurfing · UIF events"]
-        CCID["CCIDRegistry\nKYC tiers · Expiration\nCredential uniqueness"]
+        BOBC["CRE_BOBC<br/>BatchPoRApprovalMinter<br/>onReport(): delta == sum → batch mint"]
+        TOKEN["StablecoinBOBC (ERC-20)<br/>_update() → compliance hook"]
+        POLICY["PolicyManager (ACE mock)<br/>KYC limits · Sanctions<br/>Anti-smurfing · UIF events"]
+        CCID["CCIDRegistry<br/>KYC tiers · Expiration<br/>Credential uniqueness"]
     end
 
     USER -- "1. Pay fiat" --> API
     API -- "2. bankBalance + approvedIds" --> POR
-    MCP -- "3. Verify payment,\nregister KYC" --> CCID
+    MCP -- "3. Verify payment,<br/>register KYC" --> CCID
     MCP -- "freeze / sanction" --> POLICY
     POR -- "4. Signed report" --> BOBC
     BOBC -- "5. Batch mint" --> TOKEN
     TOKEN -- "Every transfer" --> POLICY
     POLICY -- "Check KYC" --> CCID
-    POLICY -- "UIFReport event\n≥ Bs 34,500" --> UIF
+    POLICY -- "UIFReport event<br/>≥ Bs 34,500" --> UIF
 ```
 
 ---
