@@ -93,13 +93,15 @@ A production CRE workflow + an AI agent operating bank processes autonomously.
 
 - **CRE PoR Workflow** — `CronCapability` → `HTTPClient.sendRequest` → `runtime.report()` → `EVMClient.writeReport` — [`por/main.ts` L38-L140][t2-por]
 - **AI Agent + CRE bridge** — Gemini Vision validates receipts, then calls `cre_create_order` to create on-chain orders for CRE — [`AGENT/index.js` L109-L193][t2-agent]
-- **On-chain order creation** — `CRE_BOBC.createOrder()` via viem — [`chain.js` L399-L460][t2-chain]
-- **BatchMinted event watcher** — listens to CRE_BOBC events, syncs state back — [`watcher/index.js` L30-L54][t2-watcher]
+- **On-chain order creation** — `CRE_BOBC.createOrder()` via viem — [`chain.js` L399-L460][t2-chain] | Solidity: [`CRE_BOBC.sol` L110-L129][t2-create]
+- **BatchMinted event watcher** — listens to CRE_BOBC events after oracle mints tokens — [`watcher/index.js` L30-L54][t2-watcher] | Solidity (oracle mint): [`CRE_BOBC.sol` L138-L166][t2-onreport]
 
 [t2-por]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/CRE_Chainlink/por/main.ts#L38-L140
 [t2-agent]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/AGENT/index.js#L109-L193
 [t2-chain]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/backend/chain.js#L399-L460
+[t2-create]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/CRE_BOBC.sol#L110-L129
 [t2-watcher]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/AGENT/watcher/index.js#L30-L54
+[t2-onreport]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/CRE_BOBC.sol#L138-L166
 
 ### Track 3: Risk & Compliance
 
