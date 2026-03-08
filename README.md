@@ -76,29 +76,46 @@ flowchart TB
 
 BOBC is a **stablecoin issuance mechanism** with **Proof of Reserve data feeds** and **tokenized asset lifecycle management** (mint, transfer, redeem).
 
-- **CRE `writeReport`** — signs PoR payload and delivers on-chain via `EVMClient.writeReport()` — [`por/main.ts` L65-L110](CRE_Chainlink/por/main.ts)
-- **CRE `onReport` receiver** — enforces `delta == sum` before batch minting — [`CRE_BOBC.sol` L138-L166](ACE_Chainlink/src/CRE_BOBC.sol)
-- **ERC-20 with compliance hook** — `_update()` calls PolicyManager on every transfer — [`StablecoinBOB.sol`](ACE_Chainlink/src/StablecoinBOB.sol)
-- **Mint + Redeem contracts** — [`MinterContract.sol`](ACE_Chainlink/src/MinterContract.sol) | [`RedeemContract.sol`](ACE_Chainlink/src/RedeemContract.sol)
+- **CRE `writeReport`** — signs PoR payload and delivers on-chain via `EVMClient.writeReport()` — [`por/main.ts` L65-L110][t1-write]
+- **CRE `onReport` receiver** — enforces `delta == sum` before batch minting — [`CRE_BOBC.sol` L138-L166][t1-onreport]
+- **ERC-20 with compliance hook** — `_update()` calls PolicyManager on every transfer — [`StablecoinBOB.sol`][t1-token]
+- **Mint + Redeem contracts** — [`MinterContract.sol`][t1-mint] | [`RedeemContract.sol`][t1-redeem]
+
+[t1-write]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/CRE_Chainlink/por/main.ts#L65-L110
+[t1-onreport]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/CRE_BOBC.sol#L138-L166
+[t1-token]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/StablecoinBOB.sol
+[t1-mint]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/MinterContract.sol
+[t1-redeem]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/RedeemContract.sol
 
 ### Track 2: CRE & AI
 
 A production CRE workflow + an AI agent operating bank processes autonomously.
 
-- **CRE PoR Workflow** — `CronCapability` → `HTTPClient.sendRequest` → `runtime.report()` → `EVMClient.writeReport` — [`por/main.ts` L38-L140](CRE_Chainlink/por/main.ts)
-- **AI Agent + CRE bridge** — Gemini Vision validates receipts, then calls `cre_create_order` to create on-chain orders for CRE — [`AGENT/index.js` L109-L193](AGENT/index.js)
-- **On-chain order creation** — `CRE_BOBC.createOrder()` via viem — [`chain.js` L399-L460](ACE_Chainlink/backend/chain.js)
-- **BatchMinted event watcher** — listens to CRE_BOBC events, syncs state back — [`watcher/index.js` L30-L54](AGENT/watcher/index.js)
+- **CRE PoR Workflow** — `CronCapability` → `HTTPClient.sendRequest` → `runtime.report()` → `EVMClient.writeReport` — [`por/main.ts` L38-L140][t2-por]
+- **AI Agent + CRE bridge** — Gemini Vision validates receipts, then calls `cre_create_order` to create on-chain orders for CRE — [`AGENT/index.js` L109-L193][t2-agent]
+- **On-chain order creation** — `CRE_BOBC.createOrder()` via viem — [`chain.js` L399-L460][t2-chain]
+- **BatchMinted event watcher** — listens to CRE_BOBC events, syncs state back — [`watcher/index.js` L30-L54][t2-watcher]
+
+[t2-por]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/CRE_Chainlink/por/main.ts#L38-L140
+[t2-agent]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/AGENT/index.js#L109-L193
+[t2-chain]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/backend/chain.js#L399-L460
+[t2-watcher]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/AGENT/watcher/index.js#L30-L54
 
 ### Track 3: Risk & Compliance
 
 Full Bolivian regulatory compliance enforced on-chain — CRE delivers PoR data, contracts enforce invariants.
 
-- **CRE `onReport` PoR invariant** — `delta != sum` reverts, preventing issuance without reserves — [`CRE_BOBC.sol` L138-L166](ACE_Chainlink/src/CRE_BOBC.sol)
-- **PolicyManager (ACE mock)** — KYC-tiered limits, sanctions, anti-smurfing (5tx/hr), auto UIF reports — [`PolicyManager.sol` L57-L96](ACE_Chainlink/src/PolicyManager.sol)
-- **CCIDRegistry (ACE mock)** — on-chain identity with tiers, expiration, credential uniqueness — [`CCIDRegistry.sol`](ACE_Chainlink/src/CCIDRegistry.sol)
-- **48-hour timelock** for compliance engine migration to real ACE — [`StablecoinBOB.sol` L82-L100](ACE_Chainlink/src/StablecoinBOB.sol)
-- **55 contract tests** covering all compliance rules — [`ACE_Chainlink/test/`](ACE_Chainlink/test/)
+- **CRE `onReport` PoR invariant** — `delta != sum` reverts, preventing issuance without reserves — [`CRE_BOBC.sol` L138-L166][t3-onreport]
+- **PolicyManager (ACE mock)** — KYC-tiered limits, sanctions, anti-smurfing (5tx/hr), auto UIF reports — [`PolicyManager.sol` L57-L96][t3-policy]
+- **CCIDRegistry (ACE mock)** — on-chain identity with tiers, expiration, credential uniqueness — [`CCIDRegistry.sol`][t3-ccid]
+- **48-hour timelock** for compliance engine migration to real ACE — [`StablecoinBOB.sol` L82-L100][t3-timelock]
+- **55 contract tests** covering all compliance rules — [`ACE_Chainlink/test/`][t3-tests]
+
+[t3-onreport]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/CRE_BOBC.sol#L138-L166
+[t3-policy]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/PolicyManager.sol#L57-L96
+[t3-ccid]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/CCIDRegistry.sol
+[t3-timelock]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/StablecoinBOB.sol#L82-L100
+[t3-tests]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/test/
 
 ---
 
