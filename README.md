@@ -113,6 +113,84 @@ Full Bolivian regulatory compliance enforced on-chain — CRE delivers PoR data,
 - **48-hour timelock** for compliance engine migration to real ACE — [`StablecoinBOB.sol` L82-L100][t3-timelock]
 - **55 contract tests** covering all compliance rules — [`ACE_Chainlink/test/`][t3-tests]
 
+#### On-Chain Compliance Enforcement Flow
+
+Every single ERC-20 operation (mint · transfer · burn) passes through this enforcement pipeline before execution:
+
+```mermaid
+flowchart TB
+    classDef err fill:#c0392b,color:#fff,stroke:#922b21,stroke-width:2px
+    classDef ok fill:#16C784,color:#fff,stroke:#0fa060,stroke-width:2px
+    classDef gate fill:#0B1C2D,color:#e8f4f8,stroke:#2e86c1,stroke-width:2px
+    classDef action fill:#1a3a5c,color:#e8f4f8,stroke:#5dade2,stroke-width:1px
+    classDef evt fill:#6c3483,color:#fff,stroke:#9b59b6,stroke-width:2px
+
+    ENTRY(["Any ERC-20 operation\nmint · transfer · burn"])
+    ENTRY --> SPLIT{{"StablecoinBOB._update()\nDetect operation type"}}
+    class SPLIT gate
+
+    SPLIT -->|"from == 0x0  ·  Mint"| MCHECK["checkMint(to, amount)\n+ recordMint(to, amount)"]:::action
+    MCHECK --> MOK(["✅ Mint executed"]):::ok
+
+    SPLIT -->|"to == 0x0  ·  Burn"| BCHECK["checkRedeem(from, amount)\n+ recordTransfer(from, 0, amount)"]:::action
+    BCHECK --> BOK(["✅ Burn executed"]):::ok
+
+    SPLIT -->|"from ≠ 0  ·  to ≠ 0  ·  Transfer"| G1
+
+    subgraph CHECKS["PolicyManager.checkTransfer — 6 sequential guards"]
+        G1{{"① Global pause?"}}
+        G1 -->|yes| X1(["⛔ revert Paused"]):::err
+        G1 -->|no| G2
+
+        G2{{"② Sanctioned?\nOFAC · Bolivia UIF list"}}
+        G2 -->|"from or to flagged"| X2(["⛔ revert Sanctioned"]):::err
+        G2 -->|no| G3
+
+        G3{{"③ Wallet frozen?\nAdmin or court order"}}
+        G3 -->|"from frozen"| X3(["⛔ revert WalletFrozen"]):::err
+        G3 -->|no| G4
+
+        G4{{"④ Anti-smurfing cooldown\nactive on sender?"}}
+        G4 -->|yes| X4(["⛔ revert CooldownActive\n(up to 2h block)"]):::err
+        G4 -->|no| G5
+
+        G5{{"⑤ KYC valid?\nactive · not expired · registered"}}
+        G5 -->|no| X5(["⛔ revert InvalidCCID"]):::err
+        G5 -->|yes| LIMIT["_getDailyLimit(from)\n← CCIDRegistry.getTier()"]:::action
+
+        LIMIT -->|"KYC Tier 1 · Individual"| LT1["Bs 5,000 / day"]:::action
+        LIMIT -->|"KYC Tier 2 · Enhanced"| LT2["Bs 34,000 / day"]:::action
+        LIMIT -->|"KYC Tier 3 · Corporate"| LT3["Bs 500,000 / day"]:::action
+
+        LT1 & LT2 & LT3 --> G6
+
+        G6{{"⑥ dailyVolume[from][day]\n+ amount  >  tier limit?"}}
+        G6 -->|yes| X6(["⛔ revert DailyLimitExceeded"]):::err
+        G6 -->|no| PASS(["✅ Transfer allowed"]):::ok
+    end
+
+    class G1,G2,G3,G4,G5,G6 gate
+
+    PASS --> REC
+
+    subgraph RECORD["PolicyManager.recordTransfer — Compliance side effects"]
+        REC["dailyVolume[from][day] += amount"]:::action
+        REC --> SMU["txCountByHour[from][hour]++"]:::action
+        SMU --> SM{{"txCount ≥ 5\nthis hour?"}}
+        SM -->|yes| CD["cooldownUntil[from] = now + 2h"]:::action
+        CD --> ECD(["📡 emit CooldownActivated\n2-hour transfer block on sender"]):::evt
+        ECD --> UIFCHK
+        SM -->|no| UIFCHK
+
+        UIFCHK{{"amount ≥ Bs 34,500?\nBolivian UIF threshold"}}
+        UIFCHK -->|yes| UIFREP(["📋 emit UIFReport\n→ Bolivia UIF regulator\nautomatically on-chain"]):::evt
+        UIFREP --> DONE(["✅ Transfer complete"]):::ok
+        UIFCHK -->|no| DONE
+    end
+
+    class SM,UIFCHK gate
+```
+
 [t3-onreport]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/CRE_BOBC.sol#L138-L166
 [t3-policy]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/PolicyManager.sol#L57-L96
 [t3-ccid]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/CCIDRegistry.sol
