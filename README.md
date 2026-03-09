@@ -78,12 +78,12 @@ BOBC is a **stablecoin issuance mechanism** with **Proof of Reserve data feeds**
 
 - **CRE `writeReport`** — signs PoR payload and delivers on-chain via `EVMClient.writeReport()` — [`por/main.ts` L65-L110][t1-write]
 - **CRE `onReport` receiver** — enforces `delta == sum` before batch minting — [`CRE_BOBC.sol` L138-L166][t1-onreport]
-- **ERC-20 with compliance hook** — `_update()` calls PolicyManager on every transfer — [`StablecoinBOB.sol`][t1-token]
+- **ERC-20 with compliance hook** — `_update()` calls PolicyManager on every transfer — [`StablecoinBOB.sol` L103-L128][t1-token]
 - **Mint + Redeem contracts** — [`MinterContract.sol`][t1-mint] | [`RedeemContract.sol`][t1-redeem]
 
 [t1-write]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/CRE_Chainlink/por/main.ts#L65-L110
 [t1-onreport]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/CRE_BOBC.sol#L138-L166
-[t1-token]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/StablecoinBOB.sol
+[t1-token]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/StablecoinBOB.sol#L103-L128
 [t1-mint]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/MinterContract.sol
 [t1-redeem]: https://github.com/fabriciojallaza/bobc/blob/f9cf55cb/ACE_Chainlink/src/RedeemContract.sol
 
